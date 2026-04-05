@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "calc": "node ./src/orbit_calc.ts",
+    "calc": "node ./src/ground_control.ts",
     "lint": "eslint --ext .js,.ts --fix",
     "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -1,3 +1,5 @@
+import type { OrbitalPosition } from './orbit.types.ts';
+import type { StellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
 import { physicalMeasureToDefault, rounding } from './utils.ts';
 
@@ -105,17 +107,6 @@ function getCartPosition(
   const x = semiMajorAxis * (C - eccentricity);
   const y = semiMajorAxis * Math.sqrt(1.0 - eccentricity * eccentricity) * S;
   return { x, y };
-}
-
-interface OrbitalPosition {
-  name: string
-  dayOfOrbit: number
-  period: number
-  revolutions?: number
-  x: number
-  y: number
-  phi: number
-
 }
 
 /**
@@ -241,83 +232,22 @@ function getSatellitePositions(
 }
 
 /**
- * A stellar object
- */
-interface StellarObject {
-  name: string
-  description?: string
-  type: 'star' | 'planet' | 'satellite'
-  params: {
-    semiMajorAxis: number | PhysicalMeasure<'space'>
-    eccentricity: number
-    period: number | PhysicalMeasure<'time'>
-    isPairPhased?: boolean
-    inclination?: Range<0, 180>
-    argPeriapsis?: Range<0, 180>
-    longitudeAscendingNode?: Range<0, 180>
-  }
-  satellites?: (StellarObject & { type: 'satellite' })[]
-}
-const starSystem: StellarObject[] = [
-  {
-    name: 'Diioc',
-    description: 'Largest Star',
-    params: {
-      semiMajorAxis: 0.366,
-      eccentricity: 0.04,
-      period: 32,
-    },
-    type: 'star',
-  },
-  {
-    name: 'Tiuuelo',
-    description: 'Smallest Star',
-    params: {
-      semiMajorAxis: 0.26,
-      eccentricity: 0.04,
-      period: 32,
-      isPairPhased: true,
-    },
-    type: 'star',
-  },
-  {
-    name: 'Terref',
-    description: 'Homeworld',
-    params: {
-      semiMajorAxis: 1.660642,
-      eccentricity: 0.0113,
-      period: 560,
-    },
-    type: 'planet',
-    satellites: [
-      {
-        name: 'Ffwniiln',
-        description: 'Satellite',
-        params: {
-          semiMajorAxis: 1.54414e-6,
-          eccentricity: 0.0564,
-          period: 8,
-        },
-        type: 'satellite',
-      },
-    ],
-  },
-];
-
-/**
  * Iterates through all the stellar objects in the star system, calculating
  * their location along one orbital period.
  *
  * Combines positions of all satellites with their host planet, so the satellite
  * @returns An array of all position data points for the star system
  */
-function getAllPositions() {
+function getAllPositions(starSystem: StellarObject[]) {
   return starSystem.flatMap((stellarObject) => {
-    const { satellites = [], name, params } = stellarObject;
+    const { satellites = [], name, posParams: params } = stellarObject;
     const { semiMajorAxis, eccentricity, period, isPairPhased } = params;
     // ensure values are numbers
     const convertedSemiMajorAxis = physicalMeasureToDefault(semiMajorAxis);
     const convertedPeriod = physicalMeasureToDefault(period);
+    if (convertedSemiMajorAxis === undefined || convertedPeriod === undefined) {
+      throw new Error('Conversion error');
+    }
 
     const orbitalPositions = getOrbitalPositions(
       name,
@@ -326,10 +256,13 @@ function getAllPositions() {
       convertedPeriod,
       { isPairPhased },
     );
-    const satellitePos = satellites.map(({ name, params }) => {
+    const satellitePos = satellites.map(({ name, posParams: params }) => {
       const { semiMajorAxis, eccentricity, period } = params;
       const convertedSemiMajorAxis = physicalMeasureToDefault(semiMajorAxis);
       const convertedPeriod = physicalMeasureToDefault(period);
+      if (convertedSemiMajorAxis === undefined || convertedPeriod === undefined) {
+        throw new Error('Conversion error');
+      }
       return getSatellitePositions(
         name,
         convertedSemiMajorAxis,
@@ -348,9 +281,9 @@ function getAllPositions() {
  * @returns Object keyed by the day in the orbit, with the values as the orbital
  * data for each planet.
  */
-export function getFullOrbits() {
+export function getFullOrbits(starSystem: StellarObject[]) {
   const stellarObjectByDay = groupBy(
-    getAllPositions().flatMap(positions => Object.values(positions)),
+    getAllPositions(starSystem).flatMap(positions => Object.values(positions)),
     'dayOfOrbit',
   );
 
