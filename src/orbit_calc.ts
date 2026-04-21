@@ -1,7 +1,7 @@
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
-import { physicalMeasureToDefault, rounding } from './utils.ts';
+import { rounding } from './utils.ts';
 
 const cartOrigin = { x: 0, y: 0 };
 
@@ -172,6 +172,7 @@ function getOrbitalPositions(
   { barycenter = cartOrigin, isPairPhased = false },
 ) {
   const orbitalPositions = Array.from(
+    // TODO allow conversion for higher precision
     Array.from({ length: period }).keys(),
     eachDay =>
       getOrbitalPosition(name, eachDay, semiMajorAxis, eccentricity, period, {
@@ -242,32 +243,21 @@ function getAllPositions(starSystem: StellarObject[]) {
   return starSystem.flatMap((stellarObject) => {
     const { satellites = [], name, posParams: params } = stellarObject;
     const { semiMajorAxis, eccentricity, period, isPairPhased } = params;
-    // ensure values are numbers
-    const convertedSemiMajorAxis = physicalMeasureToDefault(semiMajorAxis);
-    const convertedPeriod = physicalMeasureToDefault(period);
-    if (convertedSemiMajorAxis === undefined || convertedPeriod === undefined) {
-      throw new Error('Conversion error');
-    }
 
     const orbitalPositions = getOrbitalPositions(
       name,
-      convertedSemiMajorAxis,
+      semiMajorAxis,
       eccentricity,
-      convertedPeriod,
+      period,
       { isPairPhased },
     );
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const { semiMajorAxis, eccentricity, period } = params;
-      const convertedSemiMajorAxis = physicalMeasureToDefault(semiMajorAxis);
-      const convertedPeriod = physicalMeasureToDefault(period);
-      if (convertedSemiMajorAxis === undefined || convertedPeriod === undefined) {
-        throw new Error('Conversion error');
-      }
       return getSatellitePositions(
         name,
-        convertedSemiMajorAxis,
+        semiMajorAxis,
         eccentricity,
-        convertedPeriod,
+        period,
         orbitalPositions,
       );
     });

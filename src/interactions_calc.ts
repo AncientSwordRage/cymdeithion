@@ -1,10 +1,11 @@
+import type { Unit } from 'mathjs';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StellarObject } from './StellarTypes.js';
 import { mapValues, merge } from 'lodash-es';
-import { GRAV_CONST } from './constants.ts';
-import { physicalMeasureToDefault, physicalMeasureToUnit } from './utils.ts';
+import { astroMath } from './ground_control.ts';
 
 type PairKey = `${string}:${string}`;
+
 
 function getPairings(bodies: OrbitalPosition[]) {
   return bodies.flatMap((eachBody, i) => bodies
@@ -25,14 +26,14 @@ export function getSeparation(bodyA: OrbitalPosition, bodyB: OrbitalPosition) {
 }
 
 /**
- * calculates gravitationa forces
+ * calculates gravitational forces
  * @param massA in kg
  * @param massB in kg
  * @param distance in m
  * @returns newtons
  */
-export function getGravitationalForce(massA: number, massB: number, distance: number) {
-  return (GRAV_CONST * massA * massB) / distance ** 2;
+export function getGravitationalForce(massA: Unit, massB: Unit, distance: Unit) {
+  return astroMath.divide(astroMath.prod(astroMath.gravitationConstant, massA, massB), astroMath.pow(distance, 2));
 }
 
 export function getInteractions(fullOrbit: Record<number, OrbitalPosition[]>, starSystem: StellarObject[]) {
