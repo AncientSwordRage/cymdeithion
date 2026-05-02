@@ -1,5 +1,5 @@
 import type { Unit } from 'mathjs';
-import type { StellarObject, StringUnits, Transform } from './StellarTypes.js';
+import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
 import { findKey, mapValues } from 'lodash-es';
 import { astroMath } from './ground_control.ts';
 
@@ -14,11 +14,11 @@ export function rounding(val: number, places: number) {
   return Math.round(val * 10 ** places) / 10 ** places;
 }
 
-type ParamUnitKey = keyof StellarObject['intrinsicParams'] | keyof StellarObject['posParams'];
+type ParamUnitKey = keyof StellarObject<'planet' | 'satellite' | 'star'>['intrinsicParams'] | keyof StellarObject<'planet' | 'satellite' | 'star'>['posParams'];
 
 type ParamUnitRecord = Partial<Record<ParamUnitKey, string>>;
 
-type DefaultUnitsByType = Record<StellarObject['type'], ParamUnitRecord>;
+type DefaultUnitsByType = Record<StellarObject<'planet' | 'satellite' | 'star'>['type'], ParamUnitRecord>;
 
 // outputs
 export const defaultUnitsByType: DefaultUnitsByType = {
@@ -36,29 +36,22 @@ function getBase(unit: Unit) {
 }
 
 function transformObject<T extends Partial<Record<keyof T, unknown>>>(obj: T): {
-  [K in keyof T]?: Transform<T[K]>
+  [K in keyof T]: Transform<T[K]>;
 } {
-  const result: {
-    [K in keyof T]?: Transform<T[K]>
-  } = {};
+  const result = {} as Partial<{ [K in keyof T]: Transform<T[K]> }>;
   for (const key in obj) {
     result[key] = standardiseUnit(obj[key]);
   }
-  return result;
+  // console.log(result)
+  return result as { [K in keyof T]: Transform<T[K]> };
 }
 
-export function standardiseSystem(bodies: StellarObject[]) {
-  return bodies.map(body => ({
-    ...standardiseBody(body),
-    ...(body?.satellites
-      ? { satellites: body?.satellites.map(satellite => standardiseBody(satellite)) }
-      : {}
-    ),
-  }));
+export function standardiseSystem(bodies: StellarObject<'planet' | 'satellite' | 'star'>[]) {
+  return bodies.map(body => standardiseBody(body));
 };
 
-export function standardiseBody(body: StellarObject) {
-  const { intrinsicParams, posParams, ...rest } = body;
+export function standardiseBody<T extends 'star' | 'planet' | 'satellite'>(body: StellarObject<T>): StandardisedStellarObject<T> {
+  const { intrinsicParams, posParams, satellites = [], ...rest } = body;
 
   const intrinsicStandardised = transformObject(intrinsicParams);
   const posStandardised = transformObject(posParams);
@@ -66,10 +59,14 @@ export function standardiseBody(body: StellarObject) {
     ...rest,
     intrinsicParams: intrinsicStandardised,
     posParams: posStandardised,
+    ...(satellites.length > 0
+      ? { satellites: satellites.map(satellite => standardiseBody(satellite)) }
+      : {}
+    ),
   };
 }
 
-const unitPattern = /^(?<value>\d+)\s(?<unit>(?:\w\s?)+)$/;
+const unitPattern = /^(?<value>-?(?:\d*\.\d+|\d+)(?:E[+-]?\d+)?)\s+(?<unit>\w+(?:\s+\w+)*)$/i;
 
 export function standardiseUnit<T>(inputUnit: T): Transform<T> {
   if (inputUnit === undefined || inputUnit === null) {
@@ -81,7 +78,9 @@ export function standardiseUnit<T>(inputUnit: T): Transform<T> {
       const { value = '0', unit = '' } = inputUnit.match(unitPattern)?.groups ?? {};
       standardUnit = astroMath.unit(Number.parseFloat(value), unit);
     }
-    return inputUnit as Transform<T>;
+    else {
+      return inputUnit as Transform<T>;
+    }
   }
   else if (typeof inputUnit === 'number' || typeof inputUnit === 'boolean') {
     return inputUnit as Transform<T>;

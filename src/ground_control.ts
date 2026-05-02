@@ -5,15 +5,13 @@ import { getInteractions } from './interactions_calc.ts';
 import { getFullOrbits } from './orbit_calc.ts';
 import { standardiseSystem } from './utils.ts';
 
-const isReferenceBody = (value: StellarObject): value is StellarObject & { referenceBody: boolean } => value?.referenceBody ?? false;
+const isReferenceBody = (value: StellarObject<'planet' | 'satellite' | 'star'>): value is StellarObject<'planet' | 'satellite' | 'star'> & { referenceBody: boolean } => value?.referenceBody ?? false;
 
 // configure specific units etc
 export const astroMath = launch_mathjs(terrefStarSystem.find(isReferenceBody));
 
 const standardisedStarSystem = standardiseSystem(terrefStarSystem);
-
 const fullOrbits = getFullOrbits(standardisedStarSystem);
-
-const fullInteractions = getInteractions(fullOrbits, terrefStarSystem);
+const fullInteractions = getInteractions(fullOrbits, standardisedStarSystem);
 // eslint-disable-next-line no-console
-console.log(JSON.stringify(Object.values(fullInteractions), null, 2));
+console.log(JSON.stringify(Object.values(fullInteractions)[0], null, 2));

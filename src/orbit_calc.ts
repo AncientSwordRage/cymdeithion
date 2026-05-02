@@ -1,5 +1,5 @@
 import type { OrbitalPosition } from './orbit.types.ts';
-import type { StellarObject } from './StellarTypes.d.ts';
+import type { StandardisedStellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
 import { rounding } from './utils.ts';
 
@@ -119,10 +119,10 @@ function getCartPosition(
  * @param eccentricity How elliptical the orbit is, from 0 to 1
  * @param period The total time taken to complete one orbit
  * @param options optional params
- * @param options.barycenter the base x, y co-ord for the oject, e.g. for satellites
+ * @param options.barycentre the base x, y co-ord for the oject, e.g. for satellites
  * @param options.isPairPhased if this object is out of phase with a partner object
  * @returns details of the orbital positions
- * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycenter: 1, 0 })
+ * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycentre: 1, 0 })
  * // returns
  * { name: 'moon', dayOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
  */
@@ -132,7 +132,7 @@ function getOrbitalPosition(
   semiMajorAxis: number,
   eccentricity: number,
   period: number,
-  { barycenter = cartOrigin, isPairPhased = false },
+  { barycentre = cartOrigin, isPairPhased = false },
 ) {
   const decimalPlaces = 5;
   const meanAnomaly = getMeanAnomaly(
@@ -155,7 +155,7 @@ function getOrbitalPosition(
     dayOfOrbit,
     period,
     revolutions: Math.trunc(dayOfOrbit / period),
-    ...{ x: x + barycenter.x, y: y + barycenter.y },
+    ...{ x: x + barycentre.x, y: y + barycentre.y },
     phi: getTrueAnomaly(eccentricity, eccentricAnomaly, decimalPlaces),
   } as OrbitalPosition;
 }
@@ -169,14 +169,14 @@ function getOrbitalPositions(
   semiMajorAxis: number,
   eccentricity: number,
   period: number,
-  { barycenter = cartOrigin, isPairPhased = false },
+  { barycentre = cartOrigin, isPairPhased = false },
 ) {
   const orbitalPositions = Array.from(
     // TODO allow conversion for higher precision
     Array.from({ length: period }).keys(),
     eachDay =>
       getOrbitalPosition(name, eachDay, semiMajorAxis, eccentricity, period, {
-        barycenter,
+        barycentre,
         isPairPhased,
       }),
   );
@@ -225,7 +225,7 @@ function getSatellitePositions(
         semiMajorAxis,
         eccentricity,
         period,
-        { barycenter: { x, y } },
+        { barycentre: { x, y } },
       );
     },
   );
@@ -239,7 +239,7 @@ function getSatellitePositions(
  * Combines positions of all satellites with their host planet, so the satellite
  * @returns An array of all position data points for the star system
  */
-function getAllPositions(starSystem: StellarObject[]) {
+function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
   return starSystem.flatMap((stellarObject) => {
     const { satellites = [], name, posParams: params } = stellarObject;
     const { semiMajorAxis, eccentricity, period, isPairPhased } = params;
@@ -251,6 +251,7 @@ function getAllPositions(starSystem: StellarObject[]) {
       period,
       { isPairPhased },
     );
+    // console.log(stellarObject)
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const { semiMajorAxis, eccentricity, period } = params;
       return getSatellitePositions(
@@ -271,7 +272,7 @@ function getAllPositions(starSystem: StellarObject[]) {
  * @returns Object keyed by the day in the orbit, with the values as the orbital
  * data for each planet.
  */
-export function getFullOrbits(starSystem: StellarObject[]) {
+export function getFullOrbits(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
   const stellarObjectByDay = groupBy(
     getAllPositions(starSystem).flatMap(positions => Object.values(positions)),
     'dayOfOrbit',

@@ -1,11 +1,9 @@
-import type { Unit } from 'mathjs';
 import type { OrbitalPosition } from './orbit.types.ts';
-import type { StellarObject } from './StellarTypes.js';
+import type { StandardisedStellarObject } from './StellarTypes.js';
 import { mapValues, merge } from 'lodash-es';
 import { astroMath } from './ground_control.ts';
 
 type PairKey = `${string}:${string}`;
-
 
 function getPairings(bodies: OrbitalPosition[]) {
   return bodies.flatMap((eachBody, i) => bodies
@@ -32,12 +30,26 @@ export function getSeparation(bodyA: OrbitalPosition, bodyB: OrbitalPosition) {
  * @param distance in m
  * @returns newtons
  */
-export function getGravitationalForce(massA: Unit, massB: Unit, distance: Unit) {
-  return astroMath.divide(astroMath.prod(astroMath.gravitationConstant, massA, massB), astroMath.pow(distance, 2));
+export function getGravitationalForce(massA: number, massB: number, distance: number) {
+  const gravForce = astroMath.divide(
+    astroMath.multiply(
+      astroMath.gravitationConstant,
+      astroMath.unit(`${massA}kg`),
+      astroMath.unit(`${massB}kg`),
+    ),
+    astroMath.pow(astroMath.unit(`${distance}m`), 2),
+  );
+  return gravForce;
 }
 
-export function getInteractions(fullOrbit: Record<number, OrbitalPosition[]>, starSystem: StellarObject[]) {
-  const flattenedStarSystem = [...starSystem, ...starSystem.flatMap(body => body.satellites ? body.satellites : [])];
+export function getInteractions(
+  fullOrbit: Record<number, OrbitalPosition[]>,
+  starSystem: StandardisedStellarObject<'star' | 'planet' | 'satellite'>[],
+) {
+  const flattenedStarSystem = [
+    ...starSystem,
+    ...starSystem.flatMap(body => body.satellites ? body.satellites : []),
+  ];
   return mapValues(fullOrbit, (bodies) => {
     const pairings = getPairings(bodies);
     const separations = pairings.flatMap((pair: PairKey) => {
@@ -50,13 +62,12 @@ export function getInteractions(fullOrbit: Record<number, OrbitalPosition[]>, st
       const [pairKey = ':', distance] = Object.entries(bodyPair).at(0) ?? [':', { separation: 'missing' }];
       const separation = typeof distance?.separation === 'number' ? distance?.separation : Number.NaN;
       const [first, second] = pairKey.split(':').map(bodyName => flattenedStarSystem.find(body => body.name === bodyName));
-      const firstMass = physicalMeasureToDefault(first?.intrinsicParams?.mass);
-      const secondMass = physicalMeasureToDefault(second?.intrinsicParams?.mass);
-      const r = physicalMeasureToUnit({ amount: separation, typeOfMeasure: 'space', unitName: 'AU' }, 'meters');
+      const firstMass = first?.intrinsicParams?.mass;
+      const secondMass = second?.intrinsicParams?.mass;
       return firstMass !== undefined && secondMass !== undefined
         ? [{
             [pairKey]: {
-              gravity: getGravitationalForce(firstMass, secondMass, r),
+              gravity: getGravitationalForce(firstMass, secondMass, separation),
             },
           }]
         : [];

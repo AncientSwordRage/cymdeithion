@@ -1,15 +1,15 @@
 import type { StellarObject } from '../StellarTypes.d.ts';
 
-export const terrefStarSystem: StellarObject[] = [
+export const terrefStarSystem: StellarObject<'planet' | 'satellite' | 'star'>[] = [
   {
     name: 'Diioc',
     description: 'Largest Star',
     posParams: {
       semiMajorAxis: '0.366 AU',
       eccentricity: 0.04,
-      period: '32 local days',
+      period: '32 LocalDays',
     },
-    intrinsicParams: { mass: '1.2 m_sol' },
+    intrinsicParams: { mass: '1.2 msol' },
     type: 'star',
   },
   {
@@ -18,10 +18,10 @@ export const terrefStarSystem: StellarObject[] = [
     posParams: {
       semiMajorAxis: '0.26 AU',
       eccentricity: 0.04,
-      period: '32 local days',
+      period: '32 LocalDays',
       isPairPhased: true,
     },
-    intrinsicParams: { mass: '0.85 m_sol' },
+    intrinsicParams: { mass: '0.85 msol' },
     type: 'star',
   },
   {
@@ -30,11 +30,11 @@ export const terrefStarSystem: StellarObject[] = [
     posParams: {
       semiMajorAxis: '1.660642 AU',
       eccentricity: 0.0113,
-      period: '560 local days',
+      period: '560 LocalDays',
     },
     intrinsicParams: {
       mass: '1.09e025 kg',
-      rotationPeriod: '1.3958 earth days',
+      rotationPeriod: '1.3958 EarthDays',
     },
     referenceBody: true,
     type: 'planet',

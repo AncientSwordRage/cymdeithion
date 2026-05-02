@@ -10,10 +10,6 @@ interface BaseParam {
   fullAngleParam: Range<0, 360>;
 }
 
-export type Param<K extends keyof BaseParam = keyof BaseParam> = {
-  [P in K]: { type: P } & BaseParam[P]
-}[K];
-
 interface PositionParams {
   semiMajorAxis: BaseParam['stringUnit'];
   eccentricity: BaseParam['numberUnit'];
@@ -37,26 +33,28 @@ type Transform<T>
   = T extends `${number} ${string}` ? number
   // plain string → string (unchanged)
     : T extends string ? string
-    // primitives unchanged
-      : T extends number | boolean ? T
-      // unit objects → number
-        : T extends UnitLike ? number
-        // everything else → unchanged
-          : number;
+    // number unchanged
+      : T extends number ? number
+        : T extends boolean ? boolean
+        // unit objects → number
+          : T extends UnitLike ? number
+          // everything else → unchanged
+            : never;
 /**
  * A stellar object
  */
-export interface StellarObject {
+export interface StellarObject<T extends 'star' | 'planet' | 'satellite'> {
   name: string;
   description?: string;
-  type: 'star' | 'planet' | 'satellite';
+  type: T;
   posParams: PositionParams;
   intrinsicParams: IntrinsicParams;
   referenceBody?: boolean;
-  satellites?: (StellarObject & { type: 'satellite' })[];
+  satellites?: (StellarObject<'satellite'>)[];
 }
 
-export interface StandardisedStellarObject extends StellarObject {
-  posParams: StandardiseParams<PositionParams>;
-  intrinsicParams: StandardiseParams<IntrinsicParams>;
+export interface StandardisedStellarObject<T extends 'star' | 'planet' | 'satellite'> extends StellarObject<T> {
+  posParams: { [Property in keyof PositionParams]: Transform<PositionParams[Property]> };
+  intrinsicParams: { [Property in keyof IntrinsicParams]: Transform<IntrinsicParams[Property]> };
+  satellites?: (StandardisedStellarObject<'satellite'>)[];
 };

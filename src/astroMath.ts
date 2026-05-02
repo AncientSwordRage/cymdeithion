@@ -1,47 +1,85 @@
-import type { FactoryFunction, FactoryFunctionMap } from 'mathjs';
+import type { FactoryFunction, FactoryFunctionMap, UnitDefinition } from 'mathjs';
 import type { StellarObject } from './StellarTypes.js';
-import { addDependencies, create, createUnitDependencies, crossDependencies, dotDependencies, formatDependencies, matrixDependencies, multiplyDependencies, normDependencies, subtractDependencies, transposeDependencies, unitDependencies } from 'mathjs';
+import {
+  addDependencies,
+  create,
+  createUnitDependencies,
+  crossDependencies,
+  divideDependencies,
+  dotDependencies,
+  formatDependencies,
+  gravitationConstantDependencies,
+  matrixDependencies,
+  multiplyDependencies,
+  normDependencies,
+  subtractDependencies,
+  transposeDependencies,
+  unitDependencies,
+} from 'mathjs';
 import { M_EARTH_KG, M_MOON_KG, M_SOL_KG } from './constants.ts';
 
-const mathJsImports = { addDependencies, create, createUnitDependencies, crossDependencies, dotDependencies, formatDependencies, matrixDependencies, multiplyDependencies, normDependencies, subtractDependencies, transposeDependencies, unitDependencies } as Record<string, FactoryFunctionMap | FactoryFunction<any>>;
+const mathJsImports = {
+  addDependencies,
+  createUnitDependencies,
+  crossDependencies,
+  divideDependencies,
+  dotDependencies,
+  formatDependencies,
+  matrixDependencies,
+  multiplyDependencies,
+  normDependencies,
+  subtractDependencies,
+  transposeDependencies,
+  unitDependencies,
+  gravitationConstantDependencies,
+} as Record<string, FactoryFunctionMap | FactoryFunction<any>>;
 const math = create(mathJsImports);
 
-export default function launch_mathjs(referenceBody: undefined | (StellarObject & { referenceBody: boolean })) {
+type ReferenceBody = (StellarObject<'star' | 'planet' | 'satellite'> & {
+  referenceBody: boolean;
+});
+
+export default function launch_mathjs(referenceBody: undefined | ReferenceBody) {
   const referenceBodyUnits = referenceBody !== undefined
     ? {
         day: {
           definition: referenceBody.intrinsicParams.rotationPeriod as string ?? '1 day',
-          aliases: [`${referenceBody.name} day`, 'local days'],
+          aliases: [`${referenceBody.name}Day`, 'LocalDays'],
         },
-      }
+      } as Record<string, UnitDefinition>
     : {};
   math.createUnit({
-    'AU': {
+    AU: {
       definition: '1.495979e11 m',
-      aliases: ['Astronomical Unit', 'A.U.'],
+      aliases: ['AstronomicalUnit'],
     },
-    'ly': {
-      definition: '1.9.4607e15 m',
-      aliases: ['light year'],
+    ly: {
+      definition: '1.94607e15 m',
+      aliases: ['lightyear'],
     },
-    'solar mass': {
+    MSol: {
       definition: `${M_SOL_KG} kg`,
-      aliases: ['M Sol', 'm_sol'],
+      aliases: ['SolarMass', 'msol'],
     },
-    'earth mass': {
+    MEarth: {
       definition: `${M_EARTH_KG} kg`,
-      aliases: ['M Earth', 'm_earth'],
+      aliases: ['EarthMass', 'mearth'],
     },
-    'lunar mass': {
+    MLunar: {
       definition: `${M_MOON_KG} kg`,
-      aliases: ['M moon', 'm_moon'],
+      aliases: ['LunarMass', 'mmoon'],
     },
-    'earth day': {
+    EarthDay: {
       definition: '86400 s',
+      aliases: ['EarthDays'],
     },
-    ...referenceBodyUnits,
   }, {
     override: true,
   });
+  if (referenceBody) {
+    math.createUnit(referenceBodyUnits, {
+      override: true,
+    });
+  }
   return math;
 }
