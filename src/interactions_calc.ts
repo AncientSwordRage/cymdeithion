@@ -1,3 +1,4 @@
+import type { Unit } from 'mathjs';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.js';
 import { mapValues, merge } from 'lodash-es';
@@ -32,14 +33,14 @@ export function getSeparation(bodyA: OrbitalPosition, bodyB: OrbitalPosition) {
  */
 export function getGravitationalForce(massA: number, massB: number, distance: number) {
   const gravForce = astroMath.divide(
-    astroMath.multiply(
+    astroMath.multiply<Unit>(
       astroMath.gravitationConstant,
       astroMath.unit(`${massA}kg`),
       astroMath.unit(`${massB}kg`),
     ),
-    astroMath.pow(astroMath.unit(`${distance}m`), 2),
-  );
-  return gravForce;
+    astroMath.pow(astroMath.unit(`${distance}m`), 2) as Unit,
+  ) as Unit;
+  return gravForce.toBest();
 }
 
 export function getInteractions(

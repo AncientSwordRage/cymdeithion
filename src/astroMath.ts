@@ -14,6 +14,7 @@ import {
   normDependencies,
   subtractDependencies,
   transposeDependencies,
+  typedDependencies,
   unitDependencies,
 } from 'mathjs';
 import { M_EARTH_KG, M_MOON_KG, M_SOL_KG } from './constants.ts';
@@ -30,6 +31,7 @@ const mathJsImports = {
   normDependencies,
   subtractDependencies,
   transposeDependencies,
+  typedDependencies,
   unitDependencies,
   gravitationConstantDependencies,
 } as Record<string, FactoryFunctionMap | FactoryFunction<any>>;
@@ -39,7 +41,7 @@ type ReferenceBody = (StellarObject<'star' | 'planet' | 'satellite'> & {
   referenceBody: boolean;
 });
 
-export default function launch_mathjs(referenceBody: undefined | ReferenceBody) {
+export default function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
   const referenceBodyUnits = referenceBody !== undefined
     ? {
         day: {
