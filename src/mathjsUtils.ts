@@ -1,13 +1,15 @@
-type UnitJson = {
+import type { Unit } from 'mathjs';
+
+interface UnitJson {
   mathjs?: 'Unit';
   value: unknown;
   unit: string;
   fixPrefix?: boolean;
-};
+}
 
-type MathJsInstanceLike = {
+interface MathJsInstanceLike {
   isUnit?: (value: unknown) => boolean;
-};
+}
 
 export function isSerializedUnit(value: unknown): value is UnitJson {
   if (typeof value !== 'object' || value === null) {
@@ -18,7 +20,7 @@ export function isSerializedUnit(value: unknown): value is UnitJson {
   return candidate.mathjs === 'Unit' && typeof candidate.unit === 'string' && 'value' in candidate;
 }
 
-export function isLiveUnit(math: MathJsInstanceLike, value: unknown): boolean {
+export function isLiveUnit(math: MathJsInstanceLike, value: unknown): value is Unit {
   return typeof math.isUnit === 'function' && math.isUnit(value);
 }
 

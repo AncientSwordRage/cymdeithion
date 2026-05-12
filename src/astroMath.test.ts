@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import launch_mathjs from './astroMath.ts';
 import { describeMathJsValue, isSerializedUnit, unitToString } from './mathjsUtils.ts';
 
