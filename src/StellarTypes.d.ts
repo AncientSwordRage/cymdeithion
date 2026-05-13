@@ -1,3 +1,5 @@
+import type { AstroUnit } from './astroMath.ts';
+
 type StringUnits = `${number} ${string}`;
 
 interface UnitLike { value: string | number; unit: string };
@@ -30,14 +32,14 @@ interface IntrinsicParams {
 
 type Transform<T>
   // `${number} ${string}` → number
-  = T extends `${number} ${string}` ? number
+  = T extends `${number} ${string}` ? number | AstroUnit
   // plain string → string (unchanged)
     : T extends string ? string
     // number unchanged
       : T extends number ? number
         : T extends boolean ? boolean
         // unit objects → number
-          : T extends UnitLike ? number
+          : T extends UnitLike ? number | AstroUnit
           // everything else → unchanged
             : never;
 /**

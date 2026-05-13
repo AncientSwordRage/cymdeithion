@@ -85,3 +85,5 @@ export default function launch_mathjs(referenceBody?: undefined | ReferenceBody)
   }
   return math;
 }
+
+export type AstroUnit = ReturnType<ReturnType<typeof launch_mathjs>['unit']>[number];

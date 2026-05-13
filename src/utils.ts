@@ -1,7 +1,8 @@
 import type { Unit } from 'mathjs';
-import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
+import type { StandardisedStellarObject, StellarObject, StringUnits, Transform, UnitLike } from './StellarTypes.js';
 import { findKey, mapValues } from 'lodash-es';
 import { astroMath } from './ground_control.ts';
+import type { AstroUnit } from './astroMath.ts';
 
 /**
  * Utility function to do rounding.
@@ -68,15 +69,15 @@ export function standardiseBody<T extends 'star' | 'planet' | 'satellite'>(body:
 
 const unitPattern = /^(?<value>-?(?:\d*\.\d+|\d+)(?:E[+-]?\d+)?)\s+(?<unit>\w+(?:\s+\w+)*)$/i;
 
-export function standardiseUnit<T>(inputUnit: T): Transform<T> {
+export function standardiseUnit<T>(inputUnit: T, toNumber = false): Transform<T> {
   if (inputUnit === undefined || inputUnit === null) {
     throw new Error(`Cannot standardise ${typeof inputUnit} values`);
   }
-  let standardUnit: Unit | undefined;
+  let standardUnit: AstroUnit | undefined;
   if (typeof inputUnit === 'string') {
     if (isUnitsFormattedString(inputUnit)) {
       const { value = '0', unit = '' } = inputUnit.match(unitPattern)?.groups ?? {};
-      standardUnit = astroMath.unit(Number.parseFloat(value), unit);
+      standardUnit = astroMath.unit(Number.parseFloat(value), unit).toSI();
     }
     else {
       return inputUnit as Transform<T>;
@@ -87,7 +88,7 @@ export function standardiseUnit<T>(inputUnit: T): Transform<T> {
   }
   else if (isUnitLike(inputUnit)) {
     const numericValue = typeof inputUnit.value === 'string' ? Number.parseFloat(inputUnit.value) : Number(inputUnit.value);
-    standardUnit = astroMath.unit(numericValue, inputUnit.unit);
+    standardUnit = astroMath.unit(numericValue, inputUnit.unit).toSI();
   }
   if (!standardUnit) {
     throw new Error('no valid input to transform');
@@ -95,7 +96,7 @@ export function standardiseUnit<T>(inputUnit: T): Transform<T> {
   const unitType = getBase(standardUnit);
   // type is not actually exposed here
   const canonicalUnit: typeof Unit.BASE_DIMENSIONS[number] = unitType && unitType in canonicalUnits ? canonicalUnits[unitType] : standardUnit.toJSON().unit;
-  return standardUnit.toNumber(canonicalUnit) as Transform<T>;
+  return toNumber ? standardUnit.toNumber(canonicalUnit) as Transform<T> : standardUnit;
 }
 
 function isUnitsFormattedString(inputUnit: string): inputUnit is StringUnits {

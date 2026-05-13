@@ -15,7 +15,7 @@ const standardisedStarSystem = standardiseSystem(terrefStarSystem);
 const fullOrbits = getFullOrbits(standardisedStarSystem);
 const fullInteractions = getInteractions(fullOrbits, standardisedStarSystem);
 
-const gravity = Object.values(fullInteractions)[0]?.gravity;
+const gravity = Object.values(fullInteractions)[0]?.gravity ?? '0 N';
 
 // eslint-disable-next-line no-console
 console.log('[mathjs diagnostic]', describeMathJsValue(astroMath, gravity));
@@ -24,7 +24,7 @@ console.log('[mathjs diagnostic]', describeMathJsValue(astroMath, gravity));
 console.log(JSON.stringify(Object.values(fullInteractions)[0], (_key, value) => {
   const formatted = unitToString(astroMath, value);
   if (formatted !== null) {
-    return `formatted '${formatted}'`;
+    return formatted;
   }
 
   // eslint-disable-next-line ts/no-unsafe-return

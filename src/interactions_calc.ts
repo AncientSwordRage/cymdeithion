@@ -21,7 +21,7 @@ export function getRadialDistance(body: OrbitalPosition) {
 export function getSeparation(bodyA: OrbitalPosition, bodyB: OrbitalPosition) {
   const { x: x_a = 0, y: y_a = 0, z: z_a = 0 } = bodyA;
   const { x: x_b = 0, y: y_b = 0, z: z_b = 0 } = bodyB;
-  return Math.hypot(x_a - x_b, y_a - y_b, z_a - z_b);
+  return astroMath.unit(`${Math.hypot(x_a - x_b, y_a - y_b, z_a - z_b)} m`);
 }
 
 /**
@@ -59,9 +59,9 @@ export function getInteractions(
         ? [{ [pair]: { separation: getSeparation(first, second) } }]
         : [];
     });
-    const gravity = separations.flatMap((bodyPair: { [x: PairKey]: { separation: number } }) => {
-      const [pairKey = ':', distance] = Object.entries(bodyPair).at(0) ?? [':', { separation: 'missing' }];
-      const separation = typeof distance?.separation === 'number' ? distance?.separation : Number.NaN;
+    const gravity = separations.flatMap((bodyPair: { [x: PairKey]: { separation: Unit } }) => {
+      const [pairKey = ':', distance] = Object.entries(bodyPair).at(0) ?? [':', { separation: astroMath.unit('0 m') }];
+      const separation = distance?.separation;
       const [first, second] = pairKey.split(':').map(bodyName => flattenedStarSystem.find(body => body.name === bodyName));
       const firstMass = first?.intrinsicParams?.mass;
       const secondMass = second?.intrinsicParams?.mass;
@@ -73,7 +73,7 @@ export function getInteractions(
           }]
         : [];
     });
-    const interactions = merge(separations, gravity);
+    const interactions = merge(separations, gravity) satisfies Record<PairKey, typeof gravity[number][string]>[];
     return { bodies, interactions };
   });
 }
