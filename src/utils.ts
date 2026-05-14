@@ -1,8 +1,9 @@
 import type { Unit } from 'mathjs';
-import type { StandardisedStellarObject, StellarObject, StringUnits, Transform, UnitLike } from './StellarTypes.js';
-import { findKey, mapValues } from 'lodash-es';
-import { astroMath } from './ground_control.ts';
 import type { AstroUnit } from './astroMath.ts';
+import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
+import { findKey, mapValues } from 'lodash-es';
+import invariant from 'tiny-invariant';
+import { astroMath } from './ground_control.ts';
 
 /**
  * Utility function to do rounding.
@@ -31,7 +32,7 @@ export const defaultUnitsByType: DefaultUnitsByType = {
 // outputs
 const canonicalUnits = { mass: 'kg', distance: 'km', time: 'days' } as const;
 
-function getBase(unit: Unit) {
+export function getBase(unit: Unit) {
   const unitMap = mapValues(canonicalUnits, canonicalUnit => astroMath.unit(`1 ${canonicalUnit}`));
   return findKey(unitMap, thisUnit => thisUnit.equalBase(unit)) as unknown as keyof typeof canonicalUnits | undefined;
 }
@@ -41,7 +42,7 @@ function transformObject<T extends Partial<Record<keyof T, unknown>>>(obj: T): {
 } {
   const result = {} as Partial<{ [K in keyof T]: Transform<T[K]> }>;
   for (const key in obj) {
-    result[key] = standardiseUnit(obj[key]);
+    result[key] = standardiseToAstroUnit(obj[key]);
   }
   // console.log(result)
   return result as { [K in keyof T]: Transform<T[K]> };
@@ -69,7 +70,7 @@ export function standardiseBody<T extends 'star' | 'planet' | 'satellite'>(body:
 
 const unitPattern = /^(?<value>-?(?:\d*\.\d+|\d+)(?:E[+-]?\d+)?)\s+(?<unit>\w+(?:\s+\w+)*)$/i;
 
-export function standardiseUnit<T>(inputUnit: T, toNumber = false): Transform<T> {
+export function standardiseToAstroUnit<T>(inputUnit: T): Transform<T> {
   if (inputUnit === undefined || inputUnit === null) {
     throw new Error(`Cannot standardise ${typeof inputUnit} values`);
   }
@@ -90,13 +91,8 @@ export function standardiseUnit<T>(inputUnit: T, toNumber = false): Transform<T>
     const numericValue = typeof inputUnit.value === 'string' ? Number.parseFloat(inputUnit.value) : Number(inputUnit.value);
     standardUnit = astroMath.unit(numericValue, inputUnit.unit).toSI();
   }
-  if (!standardUnit) {
-    throw new Error('no valid input to transform');
-  }
-  const unitType = getBase(standardUnit);
-  // type is not actually exposed here
-  const canonicalUnit: typeof Unit.BASE_DIMENSIONS[number] = unitType && unitType in canonicalUnits ? canonicalUnits[unitType] : standardUnit.toJSON().unit;
-  return toNumber ? standardUnit.toNumber(canonicalUnit) as Transform<T> : standardUnit;
+  invariant(!!standardUnit, 'no valid input to transform');
+  return standardUnit as Transform<T>;
 }
 
 function isUnitsFormattedString(inputUnit: string): inputUnit is StringUnits {

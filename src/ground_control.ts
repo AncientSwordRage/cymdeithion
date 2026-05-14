@@ -15,7 +15,9 @@ const standardisedStarSystem = standardiseSystem(terrefStarSystem);
 const fullOrbits = getFullOrbits(standardisedStarSystem);
 const fullInteractions = getInteractions(fullOrbits, standardisedStarSystem);
 
-const gravity = Object.values(fullInteractions)[0]?.gravity ?? '0 N';
+const [firstInteraction] = Object.values(fullInteractions);
+
+const { gravity } = Object.values(firstInteraction?.interactions.at(0) ?? {}).at(0) ?? {};
 
 // eslint-disable-next-line no-console
 console.log('[mathjs diagnostic]', describeMathJsValue(astroMath, gravity));
