@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
-import launch_mathjs from './astroMath.ts';
+import { getAstroMath } from './astroMath.ts';
 import { describeMathJsValue, isSerializedUnit, unitToString } from './mathjsUtils.ts';
 
-const astroMath = launch_mathjs();
+const astroMath = getAstroMath();
 
 const u = astroMath.unit('5 m');
 const json = u.toJSON();

@@ -1,10 +1,12 @@
+import type { AstroUnit } from './astroMath.ts';
+
 export interface OrbitalPosition {
   name: string;
-  dayOfOrbit: number;
-  period: number;
+  stepOfOrbit: number;
+  period: AstroUnit;
   revolutions?: number;
-  x: number;
-  y: number;
-  z?: number;
-  phi: number;
+  x: AstroUnit;
+  y: AstroUnit;
+  z?: AstroUnit;
+  phi: AstroUnit;
 }

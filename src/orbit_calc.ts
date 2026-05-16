@@ -1,9 +1,17 @@
+import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
+import { getAstroMath } from './astroMath.ts';
 import { rounding } from './utils.ts';
 
-const cartOrigin = { x: 0, y: 0 };
+const astroMath = getAstroMath();
+
+// what units to use when making calculations
+const semiMajorAxisUnit = 'AU';
+const periodUnit = 'days';
+
+const cartOrigin = { x: astroMath.unit(`0 ${semiMajorAxisUnit}`), y: astroMath.unit(`0 ${semiMajorAxisUnit}`) };
 
 /**
  * "In celestial mechanics, the mean anomaly is the fraction of an elliptical
@@ -152,11 +160,14 @@ function getOrbitalPosition(
   );
   return {
     name,
-    dayOfOrbit,
-    period,
+    stepOfOrbit: dayOfOrbit,
+    period: astroMath.unit(period, periodUnit),
     revolutions: Math.trunc(dayOfOrbit / period),
-    ...{ x: x + barycentre.x, y: y + barycentre.y },
-    phi: getTrueAnomaly(eccentricity, eccentricAnomaly, decimalPlaces),
+    ...{
+      x: astroMath.add(astroMath.unit(x, semiMajorAxisUnit), barycentre.x),
+      y: astroMath.add(astroMath.unit(y, semiMajorAxisUnit), barycentre.y),
+    },
+    phi: astroMath.unit(getTrueAnomaly(eccentricity, eccentricAnomaly, decimalPlaces), 'degrees'),
   } as OrbitalPosition;
 }
 
@@ -166,16 +177,18 @@ function getOrbitalPosition(
  */
 function getOrbitalPositions(
   name: string,
-  semiMajorAxis: number,
+  semiMajorAxis: AstroUnit,
   eccentricity: number,
-  period: number,
+  period: AstroUnit,
   { barycentre = cartOrigin, isPairPhased = false },
 ) {
+  // TODO allow conversion for higher precision
+  const periodInDays = period.toNumber(periodUnit);
+  const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
   const orbitalPositions = Array.from(
-    // TODO allow conversion for higher precision
-    Array.from({ length: period }).keys(),
+    Array.from({ length: periodInDays }).keys(),
     eachDay =>
-      getOrbitalPosition(name, eachDay, semiMajorAxis, eccentricity, period, {
+      getOrbitalPosition(name, eachDay, smaInMetres, eccentricity, periodInDays, {
         barycentre,
         isPairPhased,
       }),
@@ -254,11 +267,13 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
     // console.log(stellarObject)
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const { semiMajorAxis, eccentricity, period } = params;
+      const periodInDays = period.toNumber(periodUnit);
+      const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
       return getSatellitePositions(
         name,
-        semiMajorAxis,
+        smaInMetres,
         eccentricity,
-        period,
+        periodInDays,
         orbitalPositions,
       );
     });
@@ -282,18 +297,19 @@ export function getFullOrbits(starSystem: StandardisedStellarObject<'planet' | '
   const lengthOrbitsCount = stellarObjectEntries.at(0)?.at(1)?.length;
   const [completeSet, incompleteSet] = partition(stellarObjectEntries, ([, stellarObjects]) => stellarObjects.length === lengthOrbitsCount);
 
-  const fullOrbits = incompleteSet.reduce((memo, [currentDay, currentObjects]) => {
-    const dayNumber = Number.parseInt(currentDay);
-    const previousObjects = memo?.[dayNumber - 1];
+  const fullOrbits = incompleteSet.reduce((memo, [currentStep, currentObjects]) => {
+    const stepNumber = Number.parseInt(currentStep);
+    const previousObjects = memo?.[stepNumber - 1];
     if (!previousObjects)
-      throw new Error(`No previous day found for ${dayNumber - 1}`);
+      throw new Error(`No previous day found for ${stepNumber - 1}`);
     const missingObjects = xorBy(previousObjects, currentObjects, 'name');
     const correctedMissingObjects = missingObjects.flatMap((stellarObj) => {
-      const modulusDayNumber = dayNumber % stellarObj.period;
-      const correctedMissingObject = memo[modulusDayNumber]?.find(eachObject => eachObject.name === stellarObj.name);
-      return correctedMissingObject ? [{ ...correctedMissingObject, dayOfOrbit: dayNumber, revolutions: Math.trunc(dayNumber / stellarObj.period) }] : [];
+      const periodAsNumber = stellarObj.period.toNumber(periodUnit);
+      const modulusStepNumber = stepNumber % periodAsNumber;
+      const correctedMissingObject = memo[modulusStepNumber]?.find(eachObject => eachObject.name === stellarObj.name);
+      return correctedMissingObject ? [{ ...correctedMissingObject, dayOfOrbit: stepNumber, revolutions: Math.trunc(stepNumber / periodAsNumber) }] : [];
     });
-    return { ...memo, [currentDay]: [...correctedMissingObjects, ...currentObjects] };
+    return { ...memo, [currentStep]: [...correctedMissingObjects, ...currentObjects] };
   }, Object.fromEntries(completeSet));
   return fullOrbits;
 }

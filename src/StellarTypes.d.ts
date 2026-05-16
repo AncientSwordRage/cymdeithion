@@ -34,7 +34,7 @@ interface IntrinsicParams {
 
 type Transform<T>
   // Can be converted to AstroUnit
-  = T extends UnitLike ? AstroUnit | undefined
+  = T extends UnitLike ? AstroUnit
   // everything else (non-physics) passes through
     : T;
 /**

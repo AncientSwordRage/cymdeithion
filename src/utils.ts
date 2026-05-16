@@ -3,7 +3,11 @@ import type { AstroUnit } from './astroMath.ts';
 import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
 import { findKey, mapValues } from 'lodash-es';
 import invariant from 'tiny-invariant';
-import { astroMath } from './ground_control.ts';
+import { getAstroMath } from './astroMath.ts';
+
+const astroMath = getAstroMath();
+
+export const isReferenceBody = (value: StellarObject<'planet' | 'satellite' | 'star'>): value is StellarObject<'planet' | 'satellite' | 'star'> & { referenceBody: boolean } => value?.referenceBody ?? false;
 
 /**
  * Utility function to do rounding.
@@ -43,6 +47,7 @@ function transformObject<T extends Partial<Record<keyof T, unknown>>>(obj: T): {
   const result = {} as Partial<{ [K in keyof T]: Transform<T[K]> }>;
   for (const key in obj) {
     result[key] = standardiseToAstroUnit(obj[key]);
+    invariant((Boolean(result[key])), `${key} in obj not transformed correctly`);
   }
   // console.log(result)
   return result as { [K in keyof T]: Transform<T[K]> };
@@ -91,7 +96,7 @@ export function standardiseToAstroUnit<T>(inputUnit: T): Transform<T> {
     const numericValue = typeof inputUnit.value === 'string' ? Number.parseFloat(inputUnit.value) : Number(inputUnit.value);
     standardUnit = astroMath.unit(numericValue, inputUnit.unit).toSI();
   }
-  invariant(!!standardUnit, 'no valid input to transform');
+  invariant(Boolean(standardUnit), 'no valid input to transform');
   return standardUnit as Transform<T>;
 }
 

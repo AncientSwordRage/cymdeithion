@@ -1,4 +1,4 @@
-import type { FactoryFunction, FactoryFunctionMap, UnitDefinition } from 'mathjs';
+import type { FactoryFunction, FactoryFunctionMap, MathJsInstance, UnitDefinition } from 'mathjs';
 import type { StellarObject } from './StellarTypes.js';
 import {
   addDependencies,
@@ -17,7 +17,10 @@ import {
   typedDependencies,
   unitDependencies,
 } from 'mathjs';
+import invariant from 'tiny-invariant';
 import { M_EARTH_KG, M_MOON_KG, M_SOL_KG } from './constants.ts';
+import { terrefStarSystem } from './example_star_systems/terref_system.ts';
+import { isReferenceBody } from './utils.ts';
 
 const mathJsImports = {
   addDependencies,
@@ -35,13 +38,23 @@ const mathJsImports = {
   unitDependencies,
   gravitationConstantDependencies,
 } as Record<string, FactoryFunctionMap | FactoryFunction<any>>;
+
 const math = create(mathJsImports);
 
 type ReferenceBody = (StellarObject<'star' | 'planet' | 'satellite'> & {
   referenceBody: boolean;
 });
 
-export default function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
+export type AstroUnit = ReturnType<ReturnType<typeof launch_mathjs>['unit']>[number];
+
+let astroMath: MathJsInstance | null = null;
+
+export function getAstroMath() {
+  invariant(astroMath !== null, 'astroMath no initiated yet');
+  return astroMath;
+}
+
+function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
   const referenceBodyUnits = referenceBody !== undefined
     ? {
         day: {
@@ -86,4 +99,5 @@ export default function launch_mathjs(referenceBody?: undefined | ReferenceBody)
   return math;
 }
 
-export type AstroUnit = ReturnType<ReturnType<typeof launch_mathjs>['unit']>[number];
+// configure specific units etc
+astroMath = launch_mathjs(terrefStarSystem.find(isReferenceBody));
