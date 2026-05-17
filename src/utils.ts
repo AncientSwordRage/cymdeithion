@@ -7,8 +7,6 @@ import { getAstroMath } from './astroMath.ts';
 
 const astroMath = getAstroMath();
 
-export const isReferenceBody = (value: StellarObject<'planet' | 'satellite' | 'star'>): value is StellarObject<'planet' | 'satellite' | 'star'> & { referenceBody: boolean } => value?.referenceBody ?? false;
-
 /**
  * Utility function to do rounding.
  * In the future this might be replaced by a native function.
@@ -20,17 +18,22 @@ export function rounding(val: number, places: number) {
   return Math.round(val * 10 ** places) / 10 ** places;
 }
 
-type ParamUnitKey = keyof StellarObject<'planet' | 'satellite' | 'star'>['intrinsicParams'] | keyof StellarObject<'planet' | 'satellite' | 'star'>['posParams'];
+export type ParamUnitKey
+  = keyof StellarObject<'planet' | 'satellite' | 'star'>['intrinsicParams']
+    | keyof StellarObject<'planet' | 'satellite' | 'star'>['posParams']
+    | 'separation';
 
-type ParamUnitRecord = Partial<Record<ParamUnitKey, string>>;
+export type ParamUnitRecord = Partial<Record<ParamUnitKey, string>>;
 
-type DefaultUnitsByType = Record<StellarObject<'planet' | 'satellite' | 'star'>['type'], ParamUnitRecord>;
+export type DefaultUnitsByType = Record<StellarObject<'planet' | 'satellite' | 'star'>['type'], ParamUnitRecord>;
+
+export const standardAstroUnits: ParamUnitRecord = { mass: 'kg', semiMajorAxis: 'AU', radius: 'km', separation: 'AU' };
 
 // outputs
 export const defaultUnitsByType: DefaultUnitsByType = {
-  planet: { mass: 'm_earth', semiMajorAxis: 'AU', radius: 'km' },
-  star: { mass: 'm_sol', semiMajorAxis: 'AU', radius: 'km' },
-  satellite: { mass: 'm_moon', semiMajorAxis: 'AU', radius: 'km' },
+  planet: { ...standardAstroUnits, mass: 'm_earth' },
+  star: { ...standardAstroUnits, mass: 'm_sol' },
+  satellite: { ...standardAstroUnits, mass: 'm_moon' },
 };
 
 // outputs

@@ -1,4 +1,4 @@
-import type { Unit } from 'mathjs';
+import type { MathJsInstance, Unit } from 'mathjs';
 
 interface UnitJson {
   mathjs?: 'Unit';
@@ -7,9 +7,9 @@ interface UnitJson {
   fixPrefix?: boolean;
 }
 
-interface MathJsInstanceLike {
-  isUnit?: (value: unknown) => boolean;
-}
+// interface MathJsInstance {
+//   isUnit?: (value: unknown) => boolean;
+// }
 
 export function isSerializedUnit(value: unknown): value is UnitJson {
   if (typeof value !== 'object' || value === null) {
@@ -20,17 +20,22 @@ export function isSerializedUnit(value: unknown): value is UnitJson {
   return candidate.mathjs === 'Unit' && typeof candidate.unit === 'string' && 'value' in candidate;
 }
 
-export function isLiveUnit(math: MathJsInstanceLike, value: unknown): value is Unit {
+export function isLiveUnit(math: MathJsInstance, value: unknown): value is Unit {
   return typeof math.isUnit === 'function' && math.isUnit(value);
 }
 
-export function unitToString(math: MathJsInstanceLike, value: unknown): string | null {
+export function unitToString(math: MathJsInstance, value: unknown, unit?: string): string | null {
   if (isSerializedUnit(value)) {
-    return `${String(value.value)} ${value.unit}`.trim();
+    const formattedUnitString = `${String(value.value)} ${value.unit}`.trim();
+    if (unit !== undefined && unit !== value.unit) {
+      const liveUnit = math.unit(formattedUnitString);
+      return liveUnit.to(unit).toString();
+    }
+    return formattedUnitString;
   }
 
   if (isLiveUnit(math, value)) {
-    return value.toString();
+    return (unit !== undefined ? value.to(unit) : value).toString();
   }
 
   if (typeof value === 'object' && value !== null) {
@@ -43,7 +48,7 @@ export function unitToString(math: MathJsInstanceLike, value: unknown): string |
   return null;
 }
 
-export function describeMathJsValue(math: MathJsInstanceLike, value: unknown) {
+export function describeMathJsValue(math: MathJsInstance, value: unknown) {
   const candidate = value as {
     constructor?: { name?: string };
     toJSON?: () => unknown;

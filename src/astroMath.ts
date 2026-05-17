@@ -18,9 +18,9 @@ import {
   unitDependencies,
 } from 'mathjs';
 import invariant from 'tiny-invariant';
+import { isReferenceBody } from './bodyGuards.ts';
 import { M_EARTH_KG, M_MOON_KG, M_SOL_KG } from './constants.ts';
 import { terrefStarSystem } from './example_star_systems/terref_system.ts';
-import { isReferenceBody } from './utils.ts';
 
 const mathJsImports = {
   addDependencies,

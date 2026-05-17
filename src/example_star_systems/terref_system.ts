@@ -45,7 +45,7 @@ export const terrefStarSystem: StellarObject<'planet' | 'satellite' | 'star'>[] 
         posParams: {
           semiMajorAxis: '1.54414e-6 AU',
           eccentricity: 0.0564,
-          period: '8 days',
+          period: '8 LocalDays',
         },
         intrinsicParams: { mass: '2.51e022 kg' },
         type: 'satellite',

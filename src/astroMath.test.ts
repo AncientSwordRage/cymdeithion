@@ -12,3 +12,6 @@ console.log('[serialized unit]', describeMathJsValue(astroMath, json));
 console.log('[serialized unit check]', isSerializedUnit(json));
 console.log('[live string]', unitToString(astroMath, u));
 console.log('[serialized string]', unitToString(astroMath, json));
+
+const dayRatio = astroMath.divide(astroMath.unit('1 day'), astroMath.unit('1 EarthDay'));
+console.log('Reference to Earth Day ratios', dayRatio);

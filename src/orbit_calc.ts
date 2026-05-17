@@ -2,6 +2,7 @@ import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
+import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { rounding } from './utils.ts';
 
@@ -9,7 +10,7 @@ const astroMath = getAstroMath();
 
 // what units to use when making calculations
 const semiMajorAxisUnit = 'AU';
-const periodUnit = 'days';
+const periodUnit = 'day';
 
 const cartOrigin = { x: astroMath.unit(`0 ${semiMajorAxisUnit}`), y: astroMath.unit(`0 ${semiMajorAxisUnit}`) };
 
@@ -121,7 +122,7 @@ function getCartPosition(
  * Gets the instantaneous position of the stellar object in orbit, as well as
  * the name and day this is for
  * @param name The name of the stellar object
- * @param dayOfOrbit The temporal instance in the orbit
+ * @param stepOfOrbit The temporal instance in the orbit
  * @param semiMajorAxis Half the length of the largest axis of the ellipses
  * orbit
  * @param eccentricity How elliptical the orbit is, from 0 to 1
@@ -132,11 +133,11 @@ function getCartPosition(
  * @returns details of the orbital positions
  * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycentre: 1, 0 })
  * // returns
- * { name: 'moon', dayOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
+ * { name: 'moon', stepOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
  */
 function getOrbitalPosition(
   name: string,
-  dayOfOrbit: number,
+  stepOfOrbit: number,
   semiMajorAxis: number,
   eccentricity: number,
   period: number,
@@ -144,7 +145,7 @@ function getOrbitalPosition(
 ) {
   const decimalPlaces = 5;
   const meanAnomaly = getMeanAnomaly(
-    dayOfOrbit,
+    stepOfOrbit,
     period,
     isPairPhased ? period / 2 : 0,
   );
@@ -160,9 +161,9 @@ function getOrbitalPosition(
   );
   return {
     name,
-    stepOfOrbit: dayOfOrbit,
+    stepOfOrbit,
     period: astroMath.unit(period, periodUnit),
-    revolutions: Math.trunc(dayOfOrbit / period),
+    revolutions: Math.trunc(stepOfOrbit / period),
     ...{
       x: astroMath.add(astroMath.unit(x, semiMajorAxisUnit), barycentre.x),
       y: astroMath.add(astroMath.unit(y, semiMajorAxisUnit), barycentre.y),
@@ -173,7 +174,7 @@ function getOrbitalPosition(
 
 /**
  * Wrapper for @see{getOrbitalPosition}
- * @returns orbital positions keyed by `dayOfOrbit`
+ * @returns orbital positions keyed by `stepOfOrbit`
  */
 function getOrbitalPositions(
   name: string,
@@ -193,12 +194,12 @@ function getOrbitalPositions(
         isPairPhased,
       }),
   );
-  return keyBy(orbitalPositions, 'dayOfOrbit') as Record<string, OrbitalPosition>;
+  return keyBy(orbitalPositions, 'stepOfOrbit') as Record<string, OrbitalPosition>;
 }
 
 /**
  * Gets the position of the satellite around the host planet, using the planet's
- * positions keyed by dayOfOrbit.
+ * positions keyed by stepOfOrbit.
  *
  * Regardless of which has the longer period, it calculates the full orbit
  *
@@ -225,13 +226,13 @@ function getSatellitePositions(
       // if the moons orbit is longer, we should mod the current day so when
       // the planet completes an orbit the correct positions are still used
       const planetPositionDay = (eachDay % allPlanetDays.length).toFixed(0);
-      if (!planetPositions[planetPositionDay]) {
-        throw new Error(
-          `key '${planetPositionDay}' (${eachDay} % ${allPlanetDays.length}) not found in position dictionary`,
-        );
-      }
+      invariant(
+        planetPositionDay in planetPositions,
+        `key '${planetPositionDay}' (${eachDay} % ${allPlanetDays.length}) not found in position dictionary`,
+      );
       // need better handling, as 'planetPositionDay' should always be in 'planetPositions'
-      const { x, y } = planetPositions[planetPositionDay];
+      const { x, y } = planetPositions[planetPositionDay] ?? {};
+      invariant(x && y, 'x and y must be defined');
       return getOrbitalPosition(
         name,
         eachDay,
@@ -242,7 +243,7 @@ function getSatellitePositions(
       );
     },
   );
-  return keyBy(orbitalPositions, 'dayOfOrbit') as Record<string, OrbitalPosition>;
+  return keyBy(orbitalPositions, 'stepOfOrbit') as Record<string, OrbitalPosition>;
 }
 
 /**
@@ -264,7 +265,6 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       period,
       { isPairPhased },
     );
-    // console.log(stellarObject)
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const { semiMajorAxis, eccentricity, period } = params;
       const periodInDays = period.toNumber(periodUnit);
@@ -290,7 +290,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
 export function getFullOrbits(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
   const stellarObjectByDay = groupBy(
     getAllPositions(starSystem).flatMap(positions => Object.values(positions)),
-    'dayOfOrbit',
+    'stepOfOrbit',
   );
 
   const stellarObjectEntries = Object.entries(stellarObjectByDay);
@@ -307,7 +307,7 @@ export function getFullOrbits(starSystem: StandardisedStellarObject<'planet' | '
       const periodAsNumber = stellarObj.period.toNumber(periodUnit);
       const modulusStepNumber = stepNumber % periodAsNumber;
       const correctedMissingObject = memo[modulusStepNumber]?.find(eachObject => eachObject.name === stellarObj.name);
-      return correctedMissingObject ? [{ ...correctedMissingObject, dayOfOrbit: stepNumber, revolutions: Math.trunc(stepNumber / periodAsNumber) }] : [];
+      return correctedMissingObject ? [{ ...correctedMissingObject, stepOfOrbit: stepNumber, revolutions: Math.trunc(stepNumber / periodAsNumber) }] : [];
     });
     return { ...memo, [currentStep]: [...correctedMissingObjects, ...currentObjects] };
   }, Object.fromEntries(completeSet));

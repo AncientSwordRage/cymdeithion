@@ -1,7 +1,7 @@
 import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.js';
-import { mapValues, merge } from 'lodash-es';
+import { mapValues } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { getBase } from './utils.ts';
@@ -27,13 +27,13 @@ function coordsInUnit(body: OrbitalPosition, unitString: string) {
 
 export function getRadialDistance(body: OrbitalPosition) {
   const { x, y, z } = coordsInUnit(body, 'm');
-  return astroMath.unit(Math.hypot(x, y, z), 'AU');
+  return astroMath.unit(Math.hypot(x, y, z), 'm');
 }
 
 export function getSeparation(bodyA: OrbitalPosition, bodyB: OrbitalPosition) {
   const { x: x_a, y: y_a, z: z_a } = coordsInUnit(bodyA, 'm');
   const { x: x_b, y: y_b, z: z_b } = coordsInUnit(bodyB, 'm');
-  return astroMath.unit(`${Math.hypot(x_a - x_b, y_a - y_b, z_a - z_b)} AU`);
+  return astroMath.unit(`${Math.hypot(x_a - x_b, y_a - y_b, z_a - z_b)} m`);
 }
 
 /**
@@ -73,23 +73,21 @@ export function getInteractions(
       invariant(first && second, 'neither body can be undefined');
       return [{ [pair]: { separation: getSeparation(first, second) } }] as Record<PairKey, { separation: AstroUnit }>[];
     });
-    const gravity = separations.flatMap((bodyPair: { [x: PairKey]: { separation: AstroUnit } }) => {
+    const interactions = separations.flatMap((bodyPair: { [x: PairKey]: { separation: AstroUnit } }) => {
       const [pairKey = ':', distance] = (Object.entries(bodyPair).at(0) ?? [':', { separation: astroMath.unit('0 m') }]) as [PairKey, { separation: AstroUnit }];
       const separation = distance?.separation;
       const [first, second] = pairKey.split(':').map(bodyName => flattenedStarSystem.find(body => body.name === bodyName));
       const firstMass = first?.intrinsicParams?.mass;
       const secondMass = second?.intrinsicParams?.mass;
       invariant(firstMass !== undefined && secondMass !== undefined, 'neither mass can be undefined');
+      const gravity = getGravitationalForce(firstMass, secondMass, separation);
       return [{
         [pairKey]: {
-          gravity: getGravitationalForce(firstMass, secondMass, separation),
+          gravity,
+          separation,
         },
-      }] as Record<PairKey, { gravity: AstroUnit }>[];
+      }] as Record<PairKey, { gravity: AstroUnit; separation: AstroUnit }>[];
     });
-    const interactions = merge(
-      separations,
-      gravity,
-    ) as Record<PairKey, { separation: AstroUnit; gravity: AstroUnit }>[];
     return { bodies, interactions };
   });
 }
