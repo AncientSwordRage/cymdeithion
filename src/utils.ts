@@ -1,4 +1,11 @@
-import { M_EARTH_KG, M_SOL_KG } from './constants.ts';
+import type { Unit } from 'mathjs';
+import type { AstroUnit } from './astroMath.ts';
+import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
+import { findKey, mapValues } from 'lodash-es';
+import invariant from 'tiny-invariant';
+import { getAstroMath } from './astroMath.ts';
+
+const astroMath = getAstroMath();
 
 /**
  * Utility function to do rounding.
@@ -11,98 +18,95 @@ export function rounding(val: number, places: number) {
   return Math.round(val * 10 ** places) / 10 ** places;
 }
 
-const defaultMeasures: { [UnitType in keyof Measures]: Measures[UnitType] } = {
-  time: 'days',
-  space: 'AU',
-  mass: 'kg',
+export type ParamUnitKey
+  = keyof StellarObject<'planet' | 'satellite' | 'star'>['intrinsicParams']
+    | keyof StellarObject<'planet' | 'satellite' | 'star'>['posParams']
+    | 'separation';
+
+export type ParamUnitRecord = Partial<Record<ParamUnitKey, string>>;
+
+export type DefaultUnitsByType = Record<StellarObject<'planet' | 'satellite' | 'star'>['type'], ParamUnitRecord>;
+
+export const standardAstroUnits: ParamUnitRecord = { mass: 'kg', semiMajorAxis: 'AU', radius: 'km', separation: 'AU' };
+
+// outputs
+export const defaultUnitsByType: DefaultUnitsByType = {
+  planet: { ...standardAstroUnits, mass: 'm_earth' },
+  star: { ...standardAstroUnits, mass: 'm_sol' },
+  satellite: { ...standardAstroUnits, mass: 'm_moon' },
 };
 
-type ConversionRate = {
-  [UnitType in keyof Measures]: {
-    [UnitName in Measures[UnitType]]: {
-      [Key in Measures[UnitType]]: number;
-    };
-  };
-};
+// outputs
+const canonicalUnits = { mass: 'kg', distance: 'km', time: 'days' } as const;
 
-const conversionRate: ConversionRate = {
-  time: {
-    days: {
-      days: 1,
-      hours: 24,
-      seconds: 24 * 60 * 60,
-    },
-    hours: {
-      hours: 1,
-      days: 1 / 24,
-      seconds: 60 * 60,
-    },
-    seconds: {
-      seconds: 1,
-      days: 1 / (24 * 60 * 60),
-      hours: 1 / (60 * 60),
-    },
-  },
-  space: {
-    AU: {
-      AU: 1,
-      ly: 1 / 63240.87,
-      meters: 1.495979e11,
-    },
-    ly: {
-      ly: 1,
-      AU: 63240.87,
-      meters: 9.4607e15,
-    },
-    meters: {
-      meters: 1,
-      AU: 1 / 1.495979e11,
-      ly: 1 / 9.4607e15,
-    },
-  },
-  mass: {
-    g: {
-      kg: 1000,
-      g: 1,
-      m_earth: M_EARTH_KG * 1000,
-      m_sol: M_SOL_KG * 1000,
-    },
-    kg: {
-      kg: 1,
-      g: 1 / 1000,
-      m_earth: 1 / M_EARTH_KG,
-      m_sol: 1 / M_SOL_KG,
-    },
-    m_earth: {
-      kg: M_EARTH_KG,
-      g: M_EARTH_KG / 1000,
-      m_earth: 1,
-      m_sol: M_EARTH_KG / M_SOL_KG,
-    },
-    m_sol: {
-      kg: M_SOL_KG,
-      g: M_SOL_KG / 1000,
-      m_earth: M_SOL_KG / M_EARTH_KG,
-      m_sol: 1,
-    },
-  },
-};
-
-export function physicalMeasureToUnit<T extends keyof Measures>(
-  physicalMeasure: PhysicalMeasure<T>,
-  unit: Measures[T],
-) {
-  const { typeOfMeasure, unitName, amount } = physicalMeasure;
-  const unitConversionRate = conversionRate[typeOfMeasure][unitName][unit];
-  return unitConversionRate * amount;
+export function getBase(unit: Unit) {
+  const unitMap = mapValues(canonicalUnits, canonicalUnit => astroMath.unit(`1 ${canonicalUnit}`));
+  return findKey(unitMap, thisUnit => thisUnit.equalBase(unit)) as unknown as keyof typeof canonicalUnits | undefined;
 }
-export function physicalMeasureToDefault<T extends keyof Measures>(
-  physicalMeasure: number | PhysicalMeasure<T> | undefined,
-) {
-  return physicalMeasure !== undefined && typeof physicalMeasure !== 'number'
-    ? physicalMeasureToUnit(
-        physicalMeasure,
-        defaultMeasures[physicalMeasure.typeOfMeasure],
-      )
-    : physicalMeasure;
+
+function transformObject<T extends Partial<Record<keyof T, unknown>>>(obj: T): {
+  [K in keyof T]: Transform<T[K]>;
+} {
+  const result = {} as Partial<{ [K in keyof T]: Transform<T[K]> }>;
+  for (const key in obj) {
+    result[key] = standardiseToAstroUnit(obj[key]);
+    invariant((Boolean(result[key])), `${key} in obj not transformed correctly`);
+  }
+  // console.log(result)
+  return result as { [K in keyof T]: Transform<T[K]> };
+}
+
+export function standardiseSystem(bodies: StellarObject<'planet' | 'satellite' | 'star'>[]) {
+  return bodies.map(body => standardiseBody(body));
+};
+
+export function standardiseBody<T extends 'star' | 'planet' | 'satellite'>(body: StellarObject<T>): StandardisedStellarObject<T> {
+  const { intrinsicParams, posParams, satellites = [], ...rest } = body;
+
+  const intrinsicStandardised = transformObject(intrinsicParams);
+  const posStandardised = transformObject(posParams);
+  return {
+    ...rest,
+    intrinsicParams: intrinsicStandardised,
+    posParams: posStandardised,
+    ...(satellites.length > 0
+      ? { satellites: satellites.map(satellite => standardiseBody(satellite)) }
+      : {}
+    ),
+  };
+}
+
+const unitPattern = /^(?<value>-?(?:\d*\.\d+|\d+)(?:E[+-]?\d+)?)\s+(?<unit>\w+(?:\s+\w+)*)$/i;
+
+export function standardiseToAstroUnit<T>(inputUnit: T): Transform<T> {
+  if (inputUnit === undefined || inputUnit === null) {
+    throw new Error(`Cannot standardise ${typeof inputUnit} values`);
+  }
+  let standardUnit: AstroUnit | undefined;
+  if (typeof inputUnit === 'string') {
+    if (isUnitsFormattedString(inputUnit)) {
+      const { value = '0', unit = '' } = inputUnit.match(unitPattern)?.groups ?? {};
+      standardUnit = astroMath.unit(Number.parseFloat(value), unit).toSI();
+    }
+    else {
+      return inputUnit as Transform<T>;
+    }
+  }
+  else if (typeof inputUnit === 'number' || typeof inputUnit === 'boolean') {
+    return inputUnit as Transform<T>;
+  }
+  else if (isUnitLike(inputUnit)) {
+    const numericValue = typeof inputUnit.value === 'string' ? Number.parseFloat(inputUnit.value) : Number(inputUnit.value);
+    standardUnit = astroMath.unit(numericValue, inputUnit.unit).toSI();
+  }
+  invariant(Boolean(standardUnit), 'no valid input to transform');
+  return standardUnit as Transform<T>;
+}
+
+function isUnitsFormattedString(inputUnit: string): inputUnit is StringUnits {
+  return typeof inputUnit === 'string' && unitPattern.test(inputUnit);
+}
+
+function isUnitLike(x: unknown): x is { value: string | number; unit: string } {
+  return typeof x === 'object' && x !== null && 'value' in x && 'unit' in x;
 }
