@@ -2,7 +2,7 @@ import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { terrefStarSystem } from './example_star_systems/terref_system.ts';
 import { getInteractions } from './interactions_calc.ts';
-import { describeMathJsValue, unitToString } from './mathjsUtils.ts';
+import { describeMathJsValue, unitToString } from './utils/mathjsUtils.ts';
 import { getFullOrbits } from './orbit_calc.ts';
 import { standardAstroUnits, standardiseSystem } from './utils.ts';
 
