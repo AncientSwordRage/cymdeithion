@@ -2,9 +2,9 @@ import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { terrefStarSystem } from './example_star_systems/terref_system.ts';
 import { getInteractions } from './interactions_calc.ts';
-import { describeMathJsValue, unitToString } from './mathjsUtils.ts';
 import { getFullOrbits } from './orbit_calc.ts';
 import { standardAstroUnits, standardiseSystem } from './utils.ts';
+import { describeMathJsValue, unitToString } from './utils/mathjsUtils.ts';
 
 const astroMath = getAstroMath();
 
@@ -22,9 +22,13 @@ const { gravity } = Object.values(firstPair).at(0) ?? {};
 console.log('[mathjs diagnostic] gravity', describeMathJsValue(astroMath, gravity));
 
 // eslint-disable-next-line no-console
-console.log('Outputting day 0 of orbital interactions and positions');
+console.log('Outputting day 0, 280 and 559 of orbital interactions and positions');
 // eslint-disable-next-line no-console
-console.log(JSON.stringify(fullInteractions, (key, value) => {
+console.log(JSON.stringify([
+  firstInteraction.bodyTotals,
+  Object.values(fullInteractions).at(280)?.bodyTotals,
+  Object.values(fullInteractions).at(-1)?.bodyTotals,
+], (key, value) => {
   const preferredUnit = key in standardAstroUnits
     ? standardAstroUnits[key as keyof typeof standardAstroUnits]
     : undefined;

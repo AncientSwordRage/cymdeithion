@@ -1,14 +1,30 @@
+import type { MathArray } from 'mathjs';
 import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.js';
+import type { Vec3 } from './utils/vec3Utils.ts';
 import { mapValues } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { getBase } from './utils.ts';
+import { coordsFromUnit, getDirection, normalizeThreeVec } from './utils/vec3Utils.ts';
 
 const astroMath = getAstroMath();
 
 type PairKey = `${string}:${string}`;
+
+type PairwiseSeparations = Record<PairKey, {
+  separation: AstroUnit;
+  directionAB: Vec3;
+  directionBA: Vec3;
+}>;
+
+type PairwiseInteractions = Record<PairKey, {
+  gravity: AstroUnit;
+  separation: AstroUnit;
+  directionAB: Vec3;
+  directionBA: Vec3;
+}>;
 
 function getPairings(bodies: OrbitalPosition[]) {
   return bodies.flatMap((eachBody, i) => bodies
@@ -18,22 +34,19 @@ function getPairings(bodies: OrbitalPosition[]) {
     })).sort();
 }
 
-function coordsInUnit(body: OrbitalPosition, unitString: string) {
-  const x = body?.x.toNumber(unitString) ?? 0;
-  const y = body?.y.toNumber(unitString) ?? 0;
-  const z = body?.y.toNumber(unitString) ?? 0;
-  return { x, y, z };
-}
-
 export function getRadialDistance(body: OrbitalPosition) {
-  const { x, y, z } = coordsInUnit(body, 'm');
+  const { x, y, z } = coordsFromUnit(body, 'm');
   return astroMath.unit(Math.hypot(x, y, z), 'm');
 }
 
 export function getSeparation(bodyA: OrbitalPosition, bodyB: OrbitalPosition) {
-  const { x: x_a, y: y_a, z: z_a } = coordsInUnit(bodyA, 'm');
-  const { x: x_b, y: y_b, z: z_b } = coordsInUnit(bodyB, 'm');
-  return astroMath.unit(`${Math.hypot(x_a - x_b, y_a - y_b, z_a - z_b)} m`);
+  const { x: x_a, y: y_a, z: z_a } = coordsFromUnit(bodyA, 'm');
+  const { x: x_b, y: y_b, z: z_b } = coordsFromUnit(bodyB, 'm');
+  const magScalar = Math.hypot(x_a - x_b, y_a - y_b, z_a - z_b);
+  const magnitude = astroMath.unit(`${magScalar} m`);
+  const directionAB = normalizeThreeVec(getDirection(bodyA, bodyB), magScalar);
+  const directionBA = normalizeThreeVec(getDirection(bodyB, bodyA), magScalar);
+  return { magnitude, directionAB, directionBA };
 }
 
 /**
@@ -57,7 +70,7 @@ export function getGravitationalForce(massA: AstroUnit, massB: AstroUnit, distan
   ) as AstroUnit;
   return gravForce.toBest();
 }
-
+const zeroGravityVector = Array.from({ length: 3 }).fill(astroMath.unit('0 N')) as MathArray<AstroUnit>;
 export function getInteractions(
   fullOrbit: Record<number, OrbitalPosition[]>,
   starSystem: StandardisedStellarObject<'star' | 'planet' | 'satellite'>[],
@@ -71,11 +84,13 @@ export function getInteractions(
     const separations = pairings.flatMap((pair: PairKey) => {
       const [first, second] = pair.split(':').map(bodyName => bodies.find(body => body.name === bodyName));
       invariant(first && second, 'neither body can be undefined');
-      return [{ [pair]: { separation: getSeparation(first, second) } }] as Record<PairKey, { separation: AstroUnit }>[];
+      const { magnitude: separation, directionAB, directionBA } = getSeparation(first, second);
+      return [{ [pair]: { separation, directionAB, directionBA } } as PairwiseSeparations];
     });
-    const interactions = separations.flatMap((bodyPair: { [x: PairKey]: { separation: AstroUnit } }) => {
-      const [pairKey = ':', distance] = (Object.entries(bodyPair).at(0) ?? [':', { separation: astroMath.unit('0 m') }]) as [PairKey, { separation: AstroUnit }];
-      const separation = distance?.separation;
+    const interactions = separations.flatMap((bodyPair: PairwiseSeparations) => {
+      const [pairKey = ':', distance] = (Object.entries(bodyPair).at(0)
+        ?? [':', { separation: astroMath.unit('0 m') }]) as [PairKey, PairwiseSeparations[PairKey]];
+      const { separation, directionAB, directionBA } = distance;
       const [first, second] = pairKey.split(':').map(bodyName => flattenedStarSystem.find(body => body.name === bodyName));
       const firstMass = first?.intrinsicParams?.mass;
       const secondMass = second?.intrinsicParams?.mass;
@@ -85,9 +100,37 @@ export function getInteractions(
         [pairKey]: {
           gravity,
           separation,
+          directionAB,
+          directionBA,
         },
-      }] as Record<PairKey, { gravity: AstroUnit; separation: AstroUnit }>[];
+      }] as PairwiseInteractions[];
     });
-    return { bodies, interactions };
+    const bodyTotals = interactions.reduce((memo, bodyPair: PairwiseInteractions) => {
+      const [pairKey = ':', interactions] = Object.entries(bodyPair).at(0)
+        ?? [':', {}];
+      const [first, second] = pairKey.split(':') as [keyof typeof memo, keyof typeof memo];
+      invariant(first !== undefined && second !== undefined, 'neither key can be undefined');
+      const { gravity, directionAB, directionBA } = interactions;
+      invariant(gravity !== undefined, 'gravity cannot be undefined');
+      invariant(directionAB !== undefined && directionBA !== undefined, 'neither direction can be undefined');
+      const { totalGravity: totalGravityA } = memo[first] ?? { totalGravity: zeroGravityVector };
+      const { totalGravity: totalGravityB } = memo[second] ?? { totalGravity: zeroGravityVector };
+      const newGravityA = astroMath.multiply(gravity, [...directionAB]) as MathArray<AstroUnit>;
+      const newGravityB = astroMath.multiply(gravity, [...directionBA]) as MathArray<AstroUnit>;
+      memo = {
+        ...memo,
+        // @ts-expect-error 'add' doesn't like '<MathArray<AstroUnit>>'
+        [first]: { ...memo[first], totalGravity: astroMath.add<MathArray<AstroUnit>>(totalGravityA, newGravityA) },
+        // @ts-expect-error 'add' doesn't like '<MathArray<AstroUnit>>'
+        [second]: { ...memo[second], totalGravity: astroMath.add<MathArray<AstroUnit>>(totalGravityB, newGravityB) },
+      };
+      return memo;
+    }, Object.fromEntries(bodies.map(body => [
+      body.name,
+      {
+        totalGravity: zeroGravityVector,
+      },
+    ])));
+    return { bodies, interactions, bodyTotals };
   });
 }

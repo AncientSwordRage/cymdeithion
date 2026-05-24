@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import { getAstroMath } from './astroMath.ts';
-import { describeMathJsValue, isSerializedUnit, unitToString } from './mathjsUtils.ts';
+import { describeMathJsValue, isSerializedUnit, unitToString } from './utils/mathjsUtils.ts';
 
 const astroMath = getAstroMath();
 
