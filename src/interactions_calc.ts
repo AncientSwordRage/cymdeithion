@@ -1,3 +1,4 @@
+import type { MathArray } from 'mathjs';
 import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.js';
@@ -21,6 +22,8 @@ type PairwiseSeparations = Record<PairKey, {
 type PairwiseInteractions = Record<PairKey, {
   gravity: AstroUnit;
   separation: AstroUnit;
+  directionAB: Vec3;
+  directionBA: Vec3;
 }>;
 
 function getPairings(bodies: OrbitalPosition[]) {
@@ -67,7 +70,7 @@ export function getGravitationalForce(massA: AstroUnit, massB: AstroUnit, distan
   ) as AstroUnit;
   return gravForce.toBest();
 }
-
+const zeroGravityVector = Array.from({ length: 3 }).fill(astroMath.unit('0 N')) as MathArray<AstroUnit>;
 export function getInteractions(
   fullOrbit: Record<number, OrbitalPosition[]>,
   starSystem: StandardisedStellarObject<'star' | 'planet' | 'satellite'>[],
@@ -85,8 +88,9 @@ export function getInteractions(
       return [{ [pair]: { separation, directionAB, directionBA } } as PairwiseSeparations];
     });
     const interactions = separations.flatMap((bodyPair: PairwiseSeparations) => {
-      const [pairKey = ':', distance] = (Object.entries(bodyPair).at(0) ?? [':', { separation: astroMath.unit('0 m') }]) as [PairKey, { separation: AstroUnit }];
-      const separation = distance?.separation;
+      const [pairKey = ':', distance] = (Object.entries(bodyPair).at(0)
+        ?? [':', { separation: astroMath.unit('0 m') }]) as [PairKey, PairwiseSeparations[PairKey]];
+      const { separation, directionAB, directionBA } = distance;
       const [first, second] = pairKey.split(':').map(bodyName => flattenedStarSystem.find(body => body.name === bodyName));
       const firstMass = first?.intrinsicParams?.mass;
       const secondMass = second?.intrinsicParams?.mass;
@@ -96,11 +100,37 @@ export function getInteractions(
         [pairKey]: {
           gravity,
           separation,
+          directionAB,
+          directionBA,
         },
       }] as PairwiseInteractions[];
     });
-    // TODO implement this - split pairs into A and B, maybe use reduce
-    const bodyTotals = interactions.flatMap((bodyPair: PairwiseInteractions) => [...Object.keys(bodyPair)]);
+    const bodyTotals = interactions.reduce((memo, bodyPair: PairwiseInteractions) => {
+      const [pairKey = ':', interactions] = Object.entries(bodyPair).at(0)
+        ?? [':', {}];
+      const [first, second] = pairKey.split(':') as [keyof typeof memo, keyof typeof memo];
+      invariant(first !== undefined && second !== undefined, 'neither key can be undefined');
+      const { gravity, directionAB, directionBA } = interactions;
+      invariant(gravity !== undefined, 'gravity cannot be undefined');
+      invariant(directionAB !== undefined && directionBA !== undefined, 'neither direction can be undefined');
+      const { totalGravity: totalGravityA } = memo[first] ?? { totalGravity: zeroGravityVector };
+      const { totalGravity: totalGravityB } = memo[second] ?? { totalGravity: zeroGravityVector };
+      const newGravityA = astroMath.multiply(gravity, [...directionAB]) as MathArray<AstroUnit>;
+      const newGravityB = astroMath.multiply(gravity, [...directionBA]) as MathArray<AstroUnit>;
+      memo = {
+        ...memo,
+        // @ts-expect-error 'add' doesn't like '<MathArray<AstroUnit>>'
+        [first]: { ...memo[first], totalGravity: astroMath.add<MathArray<AstroUnit>>(totalGravityA, newGravityA) },
+        // @ts-expect-error 'add' doesn't like '<MathArray<AstroUnit>>'
+        [second]: { ...memo[second], totalGravity: astroMath.add<MathArray<AstroUnit>>(totalGravityB, newGravityB) },
+      };
+      return memo;
+    }, Object.fromEntries(bodies.map(body => [
+      body.name,
+      {
+        totalGravity: zeroGravityVector,
+      },
+    ])));
     return { bodies, interactions, bodyTotals };
   });
 }
