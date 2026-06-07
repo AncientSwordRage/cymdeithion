@@ -18,6 +18,10 @@ export function rounding(val: number, places: number) {
   return Math.round(val * 10 ** places) / 10 ** places;
 }
 
+export function degToRad(value = 0) {
+  return (value * Math.PI) / 180;
+}
+
 export type ParamUnitKey
   = keyof StellarObject<'planet' | 'satellite' | 'star'>['intrinsicParams']
     | keyof StellarObject<'planet' | 'satellite' | 'star'>['posParams']
