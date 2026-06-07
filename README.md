@@ -10,10 +10,23 @@ Current Calculations:
 
  - Gravity
 
+## What's Next
+
+TODO automate some kind of update from the unreleased commits.
+
+<!-- cliff:up-next:start -->
+<!-- cliff:up-next:end -->
+
 ## Recent Changes
 
 TODO automate some kind of update from the latest release. Link to CHANGELOG.md
 
-## Contributing
+<!-- cliff:whats-changed:start -->
+<!-- cliff:whats-changed:end -->
 
+## Contributing
 TODO link to CONTRIBUTING.md
+
+## Recent Contributors
+<!-- cliff:contributors:start -->
+<!-- cliff:contributors:end -->
