@@ -54,7 +54,7 @@ function transformObject<T extends Partial<Record<keyof T, unknown>>>(obj: T): {
   const result = {} as Partial<{ [K in keyof T]: Transform<T[K]> }>;
   for (const key in obj) {
     result[key] = standardiseToAstroUnit(obj[key]);
-    invariant((Boolean(result[key])), `${key} in obj not transformed correctly`);
+    invariant((result[key] !== undefined), `${key} in obj not transformed correctly`);
   }
   return result as { [K in keyof T]: Transform<T[K]> };
 }

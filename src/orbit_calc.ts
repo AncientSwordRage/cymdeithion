@@ -1,4 +1,3 @@
-import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
@@ -134,21 +133,32 @@ function getCartPosition(
     z: radialDistance * (Math.sin(u) * Math.sin(i)),
   };
 }
-
+interface OrbitalShape {
+  period: number;
+  semiMajorAxis: number;
+  eccentricity: number;
+}
+interface OrbitalOrientation {
+  longitudeAscendingNode: number;
+  inclination: number;
+  argPeriapsis: number;
+}
 /**
  * Gets the instantaneous position of the stellar object in orbit, as well as
  * the name and day this is for
  * @param name The name of the stellar object
  * @param stepOfOrbit The temporal instance in the orbit
- * @param semiMajorAxis Half the length of the largest axis of the ellipses
+ * @param shape shape of the orbit
+ * @param shape.period The total time taken to complete one orbit
+ * @param shape.semiMajorAxis Half the length of the largest axis of the ellipses
  * orbit
- * @param eccentricity How elliptical the orbit is, from 0 to 1
- * @param period The total time taken to complete one orbit
- * @param options optional params
- * @param options.longitudeAscendingNode the point where the orbit of the object passes
+ * @param shape.eccentricity How elliptical the orbit is, from 0 to 1
+ * @param orientation orientation params
+ * @param orientation.longitudeAscendingNode the point where the orbit of the object passes
  * through the plane of reference
- * @param options.inclination orbit tilt
- * @param options.argPeriapsis angle of periapsis
+ * @param orientation.inclination orbit tilt
+ * @param orientation.argPeriapsis angle of periapsis
+ * @param options options for calculation
  * @param options.barycentre the base x, y co-ord for the oject, e.g. for
  * satellites
  * @param options.isPairPhased if this object is out of phase with a partner
@@ -160,13 +170,17 @@ function getCartPosition(
 function getOrbitalPosition(
   name: string,
   stepOfOrbit: number,
-  semiMajorAxis: number,
-  eccentricity: number,
-  period: number,
+  {
+    period,
+    semiMajorAxis,
+    eccentricity,
+  }: OrbitalShape,
   {
     longitudeAscendingNode = 0,
     inclination = 0,
     argPeriapsis = 0,
+  }: OrbitalOrientation,
+  {
     barycentre = cartOrigin,
     isPairPhased = false,
   },
@@ -212,18 +226,33 @@ function getOrbitalPosition(
  */
 function getOrbitalPositions(
   name: string,
-  semiMajorAxis: AstroUnit,
-  eccentricity: number,
-  period: AstroUnit,
-  { barycentre = cartOrigin, isPairPhased = false },
+  {
+    period,
+    semiMajorAxis,
+    eccentricity,
+  }: OrbitalShape,
+  {
+    longitudeAscendingNode = 0,
+    inclination = 0,
+    argPeriapsis = 0,
+  }: OrbitalOrientation,
+  {
+    barycentre = cartOrigin,
+    isPairPhased = false,
+  },
 ) {
-  // TODO allow conversion for higher precision
-  const periodInDays = period.toNumber(periodUnit);
-  const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
   const orbitalPositions = Array.from(
-    Array.from({ length: periodInDays }).keys(),
-    eachDay =>
-      getOrbitalPosition(name, eachDay, smaInMetres, eccentricity, periodInDays, {
+    Array.from({ length: period }).keys(),
+    stepOfOrbit =>
+      getOrbitalPosition(name, stepOfOrbit, {
+        semiMajorAxis,
+        eccentricity,
+        period,
+      }, {
+        longitudeAscendingNode,
+        inclination,
+        argPeriapsis,
+      }, {
         barycentre,
         isPairPhased,
       }),
@@ -238,44 +267,41 @@ function getOrbitalPositions(
  * Regardless of which has the longer period, it calculates the full orbit
  *
  * @param name
- * @param semiMajorAxis
- * @param eccentricity
- * @param period
+ * @param satelliteOrbitalShape
+ * @param satelliteOrbitalOrientation
  * @param planetPositions
  * @returns satellite positions keyed by day of orbit
  */
 function getSatellitePositions(
   name: string,
-  semiMajorAxis: number,
-  eccentricity: number,
-  period: number,
+  satelliteOrbitalShape: OrbitalShape,
+  satelliteOrbitalOrientation: OrbitalOrientation,
   planetPositions: ReturnType<typeof getOrbitalPositions>,
 ) {
-  const allPlanetDays = Object.keys(planetPositions);
+  const allPlanetSteps = Object.keys(planetPositions);
   // if planet orbit is longer, we should track the moons positions along that orbit
-  const fullOrbitalPeriod = Math.max(period, allPlanetDays.length);
+  const fullOrbitalPeriod = Math.max(satelliteOrbitalShape.period, allPlanetSteps.length);
   const orbitalPositions = Array.from(
     Array.from({ length: fullOrbitalPeriod }).keys(),
-    (eachDay) => {
+    (stepOfOrbit) => {
       // if the moons orbit is longer, we should mod the current day so when
       // the planet completes an orbit the correct positions are still used
-      const planetPositionDay = (eachDay % allPlanetDays.length).toFixed(0);
+      const planetPositionAtStep = (stepOfOrbit % allPlanetSteps.length).toFixed(0);
       invariant(
-        planetPositionDay in planetPositions,
-        `key '${planetPositionDay}' (${eachDay} % ${allPlanetDays.length}) not found in position dictionary`,
+        planetPositionAtStep in planetPositions,
+        `key '${planetPositionAtStep}' (${stepOfOrbit} % ${allPlanetSteps.length}) not found in position dictionary`,
       );
-      // need better handling, as 'planetPositionDay' should always be in 'planetPositions'
-      const { x, y, z } = planetPositions[planetPositionDay] ?? {};
+      // need better handling, as 'planetPositionAtStep' should always be in 'planetPositions'
+      const { x, y, z } = planetPositions[planetPositionAtStep] ?? {};
       invariant(
         x !== undefined && y !== undefined && z !== undefined,
         'x, y and z must be defined',
       );
       return getOrbitalPosition(
         name,
-        eachDay,
-        semiMajorAxis,
-        eccentricity,
-        period,
+        stepOfOrbit,
+        satelliteOrbitalShape,
+        satelliteOrbitalOrientation,
         { barycentre: { x, y, z } },
       );
     },
@@ -293,24 +319,43 @@ function getSatellitePositions(
 function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
   return starSystem.flatMap((stellarObject) => {
     const { satellites = [], name, posParams: params } = stellarObject;
-    const { semiMajorAxis, eccentricity, period, isPairPhased } = params;
-
-    const orbitalPositions = getOrbitalPositions(
-      name,
+    const {
       semiMajorAxis,
       eccentricity,
       period,
+      argPeriapsis = 0,
+      inclination = 0,
+      longitudeAscendingNode = 0,
+      isPairPhased = false,
+    } = params;
+    // TODO allow conversion for higher precision
+    const periodInDays = period.toNumber(periodUnit);
+    const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
+    const orbitalShape = { semiMajorAxis: smaInMetres, eccentricity, period: periodInDays };
+    const orbitalOrientation = { argPeriapsis, inclination, longitudeAscendingNode };
+    const orbitalPositions = getOrbitalPositions(
+      name,
+      orbitalShape,
+      orbitalOrientation,
       { isPairPhased },
     );
     const satellitePos = satellites.map(({ name, posParams: params }) => {
-      const { semiMajorAxis, eccentricity, period } = params;
+      const {
+        semiMajorAxis,
+        eccentricity,
+        period,
+        argPeriapsis = 0,
+        inclination = 0,
+        longitudeAscendingNode = 0,
+      } = params;
       const periodInDays = period.toNumber(periodUnit);
       const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
+      const orbitalShape = { semiMajorAxis: smaInMetres, eccentricity, period: periodInDays };
+      const orbitalOrientation = { argPeriapsis, inclination, longitudeAscendingNode };
       return getSatellitePositions(
         name,
-        smaInMetres,
-        eccentricity,
-        periodInDays,
+        orbitalShape,
+        orbitalOrientation,
         orbitalPositions,
       );
     });
