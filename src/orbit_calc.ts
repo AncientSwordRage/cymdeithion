@@ -26,7 +26,7 @@ const cartOrigin = {
  * @param offset Number of 'time unit' to offset the calculation by
  * @returns How far through the orbit the stellar object is
  */
-function getMeanAnomaly(time: number, period: number, offset: number) {
+function getMeanAnomalyRad(time: number, period: number, offset: number) {
   const pi = Math.PI;
   const meanMotion = (2 * pi) / period;
   return meanMotion * ((time + offset) % period);
@@ -37,7 +37,7 @@ function getMeanAnomaly(time: number, period: number, offset: number) {
  * along an elliptic Kepler orbit, the angle measured at the center of the
  * ellipse between the orbit's periapsis and the current position."
  * @param eccentricity How elliptical the orbit it, from 0 to 1
- * @param meanAnomaly The fraction of the ellipse orbit that has elapsed since
+ * @param meanAnomalyRad The fraction of the ellipse orbit that has elapsed since
  * periapsis
  * @param decimalPlaces How accurate to make the iterative calculation
  * @returns the angle from the center of the ellipse between the orbit's
@@ -45,35 +45,33 @@ function getMeanAnomaly(time: number, period: number, offset: number) {
  */
 function getEccentricAnomaly(
   eccentricity: number,
-  meanAnomaly: number,
+  meanAnomalyRad: number,
   decimalPlaces: number,
 ) {
   const pi = Math.PI;
-  const k = pi / 180.0;
+  const twoPi = pi * 2;
   const maxIter = 30;
   let currentIteration = 0;
   const delta = 10 ** -decimalPlaces;
-  let updatedMeanAnomaly = meanAnomaly / 360.0;
-  updatedMeanAnomaly
-    = 2.0 * pi * (updatedMeanAnomaly - Math.floor(updatedMeanAnomaly));
+  let updatedMeanAnomaly = meanAnomalyRad % (twoPi);
+  updatedMeanAnomaly += (updatedMeanAnomaly < 0 ? twoPi : 0);
 
   let updatedEccAnomaly = eccentricity < 0.8 ? updatedMeanAnomaly : pi;
-  let updatedTrueAnomaly
+  let residual
     = updatedEccAnomaly
       - eccentricity * Math.sin(updatedMeanAnomaly)
       - updatedMeanAnomaly;
 
-  while (Math.abs(updatedTrueAnomaly) > delta && currentIteration < maxIter) {
+  while (Math.abs(residual) > delta && currentIteration < maxIter) {
     updatedEccAnomaly
       = updatedEccAnomaly
-        - updatedTrueAnomaly / (1.0 - eccentricity * Math.cos(updatedEccAnomaly));
-    updatedTrueAnomaly
+      - residual / (1.0 - eccentricity * Math.cos(updatedEccAnomaly));
+    residual
       = updatedEccAnomaly
         - eccentricity * Math.sin(updatedEccAnomaly)
         - updatedMeanAnomaly;
     currentIteration += 1;
   }
-  updatedEccAnomaly = updatedEccAnomaly / k;
   return rounding(updatedEccAnomaly, decimalPlaces);
 }
 
@@ -82,21 +80,20 @@ function getEccentricAnomaly(
  * of the body, as seen from the main focus of the ellipse (the point around
  * which the object orbits)."
  * @param eccentricity How elliptical the orbit is, from 0 to 1
- * @param eccentricAnomaly The angle from the center of the ellipse between the orbit's
+ * @param eccentricAnomalyRad The angle from the center of the ellipse between the orbit's
  * periapsis and the current position
  * @param decimalPlaces how many decimal places to round this number to
  * @returns Angle between the direction of periapsis and the current position
  */
 function getTrueAnomaly(
   eccentricity: number,
-  eccentricAnomaly: number,
+  eccentricAnomalyRad: number,
   decimalPlaces: number,
 ) {
-  const k = Math.PI / 180.0;
-  const S = Math.sin(eccentricAnomaly);
-  const C = Math.cos(eccentricAnomaly);
+  const S = Math.sin(eccentricAnomalyRad);
+  const C = Math.cos(eccentricAnomalyRad);
   const fak = Math.sqrt(1.0 - eccentricity * eccentricity);
-  const phi = Math.atan2(fak * S, C - eccentricity) / k;
+  const phi = Math.atan2(fak * S, C - eccentricity);
   return rounding(phi, decimalPlaces);
 }
 
@@ -186,18 +183,18 @@ function getOrbitalPosition(
   },
 ) {
   const decimalPlaces = 5;
-  const meanAnomaly = getMeanAnomaly(
+  const meanAnomalyRad = getMeanAnomalyRad(
     stepOfOrbit,
     period,
     isPairPhased ? period / 2 : 0,
   );
-  const eccentricAnomaly = getEccentricAnomaly(
+  const eccentricAnomalyRad = getEccentricAnomaly(
     eccentricity,
-    meanAnomaly,
+    meanAnomalyRad,
     decimalPlaces,
   );
-  const radialDistance = getRadialDistance(semiMajorAxis, eccentricity, eccentricAnomaly);
-  const trueAnomaly = getTrueAnomaly(eccentricity, eccentricAnomaly, decimalPlaces);
+  const radialDistance = getRadialDistance(semiMajorAxis, eccentricity, eccentricAnomalyRad);
+  const trueAnomaly = getTrueAnomaly(eccentricity, eccentricAnomalyRad, decimalPlaces);
 
   const { x, y, z } = getCartPosition(
     radialDistance,
