@@ -43,7 +43,7 @@ function getMeanAnomalyRad(time: number, period: number, offset: number) {
  * @returns the angle from the center of the ellipse between the orbit's
  * periapsis and the current position.
  */
-function getEccentricAnomaly(
+function getEccentricAnomalyRad(
   eccentricity: number,
   meanAnomalyRad: number,
   decimalPlaces: number,
@@ -65,7 +65,7 @@ function getEccentricAnomaly(
   while (Math.abs(residual) > delta && currentIteration < maxIter) {
     updatedEccAnomaly
       = updatedEccAnomaly
-      - residual / (1.0 - eccentricity * Math.cos(updatedEccAnomaly));
+        - residual / (1.0 - eccentricity * Math.cos(updatedEccAnomaly));
     residual
       = updatedEccAnomaly
         - eccentricity * Math.sin(updatedEccAnomaly)
@@ -85,7 +85,7 @@ function getEccentricAnomaly(
  * @param decimalPlaces how many decimal places to round this number to
  * @returns Angle between the direction of periapsis and the current position
  */
-function getTrueAnomaly(
+function getTrueAnomalyRad(
   eccentricity: number,
   eccentricAnomalyRad: number,
   decimalPlaces: number,
@@ -188,20 +188,20 @@ function getOrbitalPosition(
     period,
     isPairPhased ? period / 2 : 0,
   );
-  const eccentricAnomalyRad = getEccentricAnomaly(
+  const eccentricAnomalyRad = getEccentricAnomalyRad(
     eccentricity,
     meanAnomalyRad,
     decimalPlaces,
   );
   const radialDistance = getRadialDistance(semiMajorAxis, eccentricity, eccentricAnomalyRad);
-  const trueAnomaly = getTrueAnomaly(eccentricity, eccentricAnomalyRad, decimalPlaces);
+  const trueAnomalyRad = getTrueAnomalyRad(eccentricity, eccentricAnomalyRad, decimalPlaces);
 
   const { x, y, z } = getCartPosition(
     radialDistance,
     longitudeAscendingNode,
     inclination,
     argPeriapsis,
-    trueAnomaly,
+    trueAnomalyRad,
   );
   return {
     name,
@@ -213,7 +213,7 @@ function getOrbitalPosition(
       y: astroMath.add(astroMath.unit(y, semiMajorAxisUnit), barycentre.y),
       z: astroMath.add(astroMath.unit(z, semiMajorAxisUnit), barycentre?.z),
     },
-    phi: astroMath.unit(trueAnomaly, 'degrees'),
+    phi: astroMath.unit(trueAnomalyRad * 180 / Math.PI, 'degrees'),
   } as OrbitalPosition;
 }
 
