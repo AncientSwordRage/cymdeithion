@@ -6,6 +6,7 @@ import { getInteractions } from './interactions_calc.ts';
 import { getFullOrbits } from './orbit_calc.ts';
 import { standardAstroUnits, standardiseSystem } from './utils.ts';
 import { describeMathJsValue, unitToString } from './utils/mathjsUtils.ts';
+import type { OrbitalPosition } from './orbit.types.ts';
 
 const astroMath = getAstroMath();
 
