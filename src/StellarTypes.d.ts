@@ -14,15 +14,14 @@ interface BaseParam {
   fullAngleParam: Range<0, 360>;
 }
 
-interface PositionParams {
+type PositionParams = {
   semiMajorAxis: BaseParam['stringUnit'];
   eccentricity: BaseParam['numberUnit'];
   period: BaseParam['stringUnit'];
-  isPairPhased?: BaseParam['booleanParam'];
   inclination?: BaseParam['angleParam'];
   argPeriapsis?: BaseParam['fullAngleParam'];
   longitudeAscendingNode?: BaseParam['fullAngleParam'];
-}
+} & Either<{ isPairPhased?: BaseParam['booleanParam'] }, { meanAnomalyOffset?: BaseParam['fullAngleParam'] }>;
 
 interface IntrinsicParams {
   luminosity?: BaseParam['numberUnit'];

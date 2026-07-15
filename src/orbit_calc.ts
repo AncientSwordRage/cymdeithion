@@ -140,6 +140,11 @@ interface OrbitalOrientation {
   inclination: number;
   argPeriapsis: number;
 }
+interface OrbitalOptions {
+  barycentre?: typeof cartOrigin;
+  meanAnomalyOffset?: number;
+}
+
 /**
  * Gets the instantaneous position of the stellar object in orbit, as well as
  * the name and day this is for
@@ -158,8 +163,7 @@ interface OrbitalOrientation {
  * @param options options for calculation
  * @param options.barycentre the base x, y co-ord for the oject, e.g. for
  * satellites
- * @param options.isPairPhased if this object is out of phase with a partner
- * object
+ * @param options.meanAnomalyOffset where in the orbit the body
  * @returns details of the orbital positions
  * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycentre: 1, 0 })
  * // returns { name: 'moon', stepOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
@@ -179,14 +183,14 @@ function getOrbitalPosition(
   }: OrbitalOrientation,
   {
     barycentre = cartOrigin,
-    isPairPhased = false,
-  },
+    meanAnomalyOffset = 0,
+  }: OrbitalOptions,
 ) {
   const decimalPlaces = 5;
   const meanAnomalyRad = getMeanAnomalyRad(
     stepOfOrbit,
     period,
-    isPairPhased ? period / 2 : 0,
+    meanAnomalyOffset ? period / 2 : 0,
   );
   const eccentricAnomalyRad = getEccentricAnomalyRad(
     eccentricity,
@@ -235,8 +239,8 @@ function getOrbitalPositions(
   }: OrbitalOrientation,
   {
     barycentre = cartOrigin,
-    isPairPhased = false,
-  },
+    meanAnomalyOffset = 0,
+  }: OrbitalOptions,
 ) {
   const orbitalPositions = Array.from(
     Array.from({ length: period }).keys(),
@@ -251,7 +255,7 @@ function getOrbitalPositions(
         argPeriapsis,
       }, {
         barycentre,
-        isPairPhased,
+        meanAnomalyOffset,
       }),
   );
   return keyBy(orbitalPositions, 'stepOfOrbit') as Record<string, OrbitalPosition>;
@@ -324,6 +328,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       inclination = 0,
       longitudeAscendingNode = 0,
       isPairPhased = false,
+      meanAnomalyOffset = isPairPhased ? 180 : 0,
     } = params;
     // TODO allow conversion for higher precision
     const periodInDays = period.toNumber(periodUnit);
@@ -334,7 +339,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       name,
       orbitalShape,
       orbitalOrientation,
-      { isPairPhased },
+      { meanAnomalyOffset },
     );
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const {
