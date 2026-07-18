@@ -18,6 +18,10 @@ export function rounding(val: number, places: number) {
   return Math.round(val * 10 ** places) / 10 ** places;
 }
 
+export function degToRad(value = 0) {
+  return (value * Math.PI) / 180;
+}
+
 export type ParamUnitKey
   = keyof StellarObject<'planet' | 'satellite' | 'star'>['intrinsicParams']
     | keyof StellarObject<'planet' | 'satellite' | 'star'>['posParams']
@@ -50,7 +54,7 @@ function transformObject<T extends Partial<Record<keyof T, unknown>>>(obj: T): {
   const result = {} as Partial<{ [K in keyof T]: Transform<T[K]> }>;
   for (const key in obj) {
     result[key] = standardiseToAstroUnit(obj[key]);
-    invariant((Boolean(result[key])), `${key} in obj not transformed correctly`);
+    invariant((result[key] !== undefined), `${key} in obj not transformed correctly`);
   }
   return result as { [K in keyof T]: Transform<T[K]> };
 }

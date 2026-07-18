@@ -1,3 +1,4 @@
+import type { OrbitalPosition } from './orbit.types.ts';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { terrefStarSystem } from './example_star_systems/terref_system.ts';
@@ -22,21 +23,26 @@ const { gravity } = Object.values(firstPair).at(0) ?? {};
 console.log('[mathjs diagnostic] gravity', describeMathJsValue(astroMath, gravity));
 
 // eslint-disable-next-line no-console
-console.log('Outputting day 0, 280 and 559 of orbital interactions and positions');
+console.log('Outputting day 0, 140, 280, 420 and 559 of orbital positions for Terref');
 // eslint-disable-next-line no-console
 console.log(JSON.stringify([
-  firstInteraction.bodyTotals,
-  Object.values(fullInteractions).at(280)?.bodyTotals,
-  Object.values(fullInteractions).at(-1)?.bodyTotals,
-], (key, value) => {
-  const preferredUnit = key in standardAstroUnits
-    ? standardAstroUnits[key as keyof typeof standardAstroUnits]
-    : undefined;
-  const formatted = unitToString(astroMath, value, preferredUnit);
-  if (formatted !== null) {
-    return formatted;
-  }
+  firstInteraction.bodies?.find((body: OrbitalPosition) => body.name === 'Terref'),
+  Object.values(fullInteractions).at(140)?.bodies?.find((body: OrbitalPosition) => body.name === 'Terref'),
+  Object.values(fullInteractions).at(280)?.bodies?.find((body: OrbitalPosition) => body.name === 'Terref'),
+  Object.values(fullInteractions).at(420)?.bodies?.find((body: OrbitalPosition) => body.name === 'Terref'),
+  Object.values(fullInteractions).at(-1)?.bodies?.find((body: OrbitalPosition) => body.name === 'Terref'),
+], unitStringifier(), 2));
+function unitStringifier(): ((this: any, key: string, value: any) => any) | undefined {
+  return (key, value) => {
+    const preferredUnit = key in standardAstroUnits
+      ? standardAstroUnits[key as keyof typeof standardAstroUnits]
+      : undefined;
+    const formatted = unitToString(astroMath, value, preferredUnit);
+    if (formatted !== null) {
+      return formatted;
+    }
 
-  // eslint-disable-next-line ts/no-unsafe-return
-  return value;
-}, 2));
+    // eslint-disable-next-line ts/no-unsafe-return
+    return value;
+  };
+}

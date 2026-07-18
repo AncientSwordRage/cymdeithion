@@ -1,10 +1,9 @@
-import type { AstroUnit } from './astroMath.ts';
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
-import { rounding } from './utils.ts';
+import { degToRad, rounding } from './utils.ts';
 
 const astroMath = getAstroMath();
 
@@ -12,7 +11,11 @@ const astroMath = getAstroMath();
 const semiMajorAxisUnit = 'AU';
 const periodUnit = 'day';
 
-const cartOrigin = { x: astroMath.unit(`0 ${semiMajorAxisUnit}`), y: astroMath.unit(`0 ${semiMajorAxisUnit}`) };
+const cartOrigin = {
+  x: astroMath.unit(`0 ${semiMajorAxisUnit}`),
+  y: astroMath.unit(`0 ${semiMajorAxisUnit}`),
+  z: astroMath.unit(`0 ${semiMajorAxisUnit}`),
+};
 
 /**
  * "In celestial mechanics, the mean anomaly is the fraction of an elliptical
@@ -23,9 +26,8 @@ const cartOrigin = { x: astroMath.unit(`0 ${semiMajorAxisUnit}`), y: astroMath.u
  * @param offset Number of 'time unit' to offset the calculation by
  * @returns How far through the orbit the stellar object is
  */
-function getMeanAnomaly(time: number, period: number, offset: number) {
+function getMeanAnomalyRad(time: number, period: number, offset: number) {
   const pi = Math.PI;
-  // const k = pi/180.0;
   const meanMotion = (2 * pi) / period;
   return meanMotion * ((time + offset) % period);
 }
@@ -35,43 +37,41 @@ function getMeanAnomaly(time: number, period: number, offset: number) {
  * along an elliptic Kepler orbit, the angle measured at the center of the
  * ellipse between the orbit's periapsis and the current position."
  * @param eccentricity How elliptical the orbit it, from 0 to 1
- * @param meanAnomaly The fraction of the ellipse orbit that has elapsed since
+ * @param meanAnomalyRad The fraction of the ellipse orbit that has elapsed since
  * periapsis
  * @param decimalPlaces How accurate to make the iterative calculation
  * @returns the angle from the center of the ellipse between the orbit's
  * periapsis and the current position.
  */
-function getEccentricAnomaly(
+function getEccentricAnomalyRad(
   eccentricity: number,
-  meanAnomaly: number,
+  meanAnomalyRad: number,
   decimalPlaces: number,
 ) {
   const pi = Math.PI;
-  const k = pi / 180.0;
+  const twoPi = pi * 2;
   const maxIter = 30;
   let currentIteration = 0;
   const delta = 10 ** -decimalPlaces;
-  let updatedMeanAnomaly = meanAnomaly / 360.0;
-  updatedMeanAnomaly
-    = 2.0 * pi * (updatedMeanAnomaly - Math.floor(updatedMeanAnomaly));
+  let updatedMeanAnomaly = meanAnomalyRad % (twoPi);
+  updatedMeanAnomaly += (updatedMeanAnomaly < 0 ? twoPi : 0);
 
   let updatedEccAnomaly = eccentricity < 0.8 ? updatedMeanAnomaly : pi;
-  let updatedTrueAnomaly
+  let residual
     = updatedEccAnomaly
       - eccentricity * Math.sin(updatedMeanAnomaly)
       - updatedMeanAnomaly;
 
-  while (Math.abs(updatedTrueAnomaly) > delta && currentIteration < maxIter) {
+  while (Math.abs(residual) > delta && currentIteration < maxIter) {
     updatedEccAnomaly
       = updatedEccAnomaly
-        - updatedTrueAnomaly / (1.0 - eccentricity * Math.cos(updatedEccAnomaly));
-    updatedTrueAnomaly
+        - residual / (1.0 - eccentricity * Math.cos(updatedEccAnomaly));
+    residual
       = updatedEccAnomaly
         - eccentricity * Math.sin(updatedEccAnomaly)
         - updatedMeanAnomaly;
     currentIteration += 1;
   }
-  updatedEccAnomaly = updatedEccAnomaly / k;
   return rounding(updatedEccAnomaly, decimalPlaces);
 }
 
@@ -80,84 +80,128 @@ function getEccentricAnomaly(
  * of the body, as seen from the main focus of the ellipse (the point around
  * which the object orbits)."
  * @param eccentricity How elliptical the orbit is, from 0 to 1
- * @param eccentricAnomaly The angle from the center of the ellipse between the orbit's
+ * @param eccentricAnomalyRad The angle from the center of the ellipse between the orbit's
  * periapsis and the current position
  * @param decimalPlaces how many decimal places to round this number to
  * @returns Angle between the direction of periapsis and the current position
  */
-function getTrueAnomaly(
+function getTrueAnomalyRad(
   eccentricity: number,
-  eccentricAnomaly: number,
+  eccentricAnomalyRad: number,
   decimalPlaces: number,
 ) {
-  const k = Math.PI / 180.0;
-  const S = Math.sin(eccentricAnomaly);
-  const C = Math.cos(eccentricAnomaly);
+  const S = Math.sin(eccentricAnomalyRad);
+  const C = Math.cos(eccentricAnomalyRad);
   const fak = Math.sqrt(1.0 - eccentricity * eccentricity);
-  const phi = Math.atan2(fak * S, C - eccentricity) / k;
+  const phi = Math.atan2(fak * S, C - eccentricity);
   return rounding(phi, decimalPlaces);
 }
 
-/**
- * The cartesian co-ordinates
- * @param semiMajorAxis Half the length of the largest axis of the ellipses orbit
- * @param eccentricity How elliptical the orbit is, from 0 to 1
- * @param eccentricAnomaly The angle from the center of the ellipse between the orbit's
- * periapsis and the current position.
- * @returns The x, y co-ordinates from the center of the system
- */
-function getCartPosition(
-  semiMajorAxis: number,
-  eccentricity: number,
-  eccentricAnomaly: number,
-) {
-  const S = Math.sin(eccentricAnomaly);
-  const C = Math.cos(eccentricAnomaly);
-  const x = semiMajorAxis * (C - eccentricity);
-  const y = semiMajorAxis * Math.sqrt(1.0 - eccentricity * eccentricity) * S;
-  return { x, y };
+function getRadialDistance(semiMajorAxis: number, eccentricity: number, eccentricAnomaly: number) {
+  const radialDistance = semiMajorAxis * (1 - eccentricity * Math.cos(eccentricAnomaly));
+  return radialDistance;
 }
 
+/**
+ * The cartesian Co-ordinates of the system
+ * @param radialDistance current distance from barycentre
+ * @param longitudeAscendingNode the point where the orbit of the object passes
+ * through the plane of reference
+ * @param inclination orbit tilt
+ * @param argPeriapsis angle of periapsis
+ * @param trueAnomaly angle around a Keplerian orbit, between the
+ * periapsis and the current position, from the main focus of the ellipse
+ * @returns The x, y, z co-ordinates from the center of the system
+ */
+function getCartPosition(
+  radialDistance: number,
+  longitudeAscendingNode: number,
+  inclination: number,
+  argPeriapsis: number,
+  trueAnomaly: number,
+) {
+  const Ω = degToRad(longitudeAscendingNode);
+  const i = degToRad(inclination);
+  const ω = degToRad(argPeriapsis);
+  const u = ω + trueAnomaly;
+  return {
+    x: radialDistance * (Math.cos(Ω) * Math.cos(u) - Math.sin(Ω) * Math.sin(u) * Math.cos(i)),
+    y: radialDistance * (Math.sin(Ω) * Math.cos(u) + Math.cos(Ω) * Math.sin(u) * Math.cos(i)),
+    z: radialDistance * (Math.sin(u) * Math.sin(i)),
+  };
+}
+interface OrbitalShape {
+  period: number;
+  semiMajorAxis: number;
+  eccentricity: number;
+}
+interface OrbitalOrientation {
+  longitudeAscendingNode: number;
+  inclination: number;
+  argPeriapsis: number;
+}
 /**
  * Gets the instantaneous position of the stellar object in orbit, as well as
  * the name and day this is for
  * @param name The name of the stellar object
  * @param stepOfOrbit The temporal instance in the orbit
- * @param semiMajorAxis Half the length of the largest axis of the ellipses
+ * @param shape shape of the orbit
+ * @param shape.period The total time taken to complete one orbit
+ * @param shape.semiMajorAxis Half the length of the largest axis of the ellipses
  * orbit
- * @param eccentricity How elliptical the orbit is, from 0 to 1
- * @param period The total time taken to complete one orbit
- * @param options optional params
- * @param options.barycentre the base x, y co-ord for the oject, e.g. for satellites
- * @param options.isPairPhased if this object is out of phase with a partner object
+ * @param shape.eccentricity How elliptical the orbit is, from 0 to 1
+ * @param orientation orientation params
+ * @param orientation.longitudeAscendingNode the point where the orbit of the object passes
+ * through the plane of reference
+ * @param orientation.inclination orbit tilt
+ * @param orientation.argPeriapsis angle of periapsis
+ * @param options options for calculation
+ * @param options.barycentre the base x, y co-ord for the oject, e.g. for
+ * satellites
+ * @param options.isPairPhased if this object is out of phase with a partner
+ * object
  * @returns details of the orbital positions
  * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycentre: 1, 0 })
- * // returns
- * { name: 'moon', stepOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
+ * // returns { name: 'moon', stepOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
  */
 function getOrbitalPosition(
   name: string,
   stepOfOrbit: number,
-  semiMajorAxis: number,
-  eccentricity: number,
-  period: number,
-  { barycentre = cartOrigin, isPairPhased = false },
+  {
+    period,
+    semiMajorAxis,
+    eccentricity,
+  }: OrbitalShape,
+  {
+    longitudeAscendingNode = 0,
+    inclination = 0,
+    argPeriapsis = 0,
+  }: OrbitalOrientation,
+  {
+    barycentre = cartOrigin,
+    isPairPhased = false,
+  },
 ) {
   const decimalPlaces = 5;
-  const meanAnomaly = getMeanAnomaly(
+  const meanAnomalyRad = getMeanAnomalyRad(
     stepOfOrbit,
     period,
     isPairPhased ? period / 2 : 0,
   );
-  const eccentricAnomaly = getEccentricAnomaly(
+  const eccentricAnomalyRad = getEccentricAnomalyRad(
     eccentricity,
-    meanAnomaly,
+    meanAnomalyRad,
     decimalPlaces,
   );
-  const { x, y } = getCartPosition(
-    semiMajorAxis,
-    eccentricity,
-    eccentricAnomaly,
+  const radialDistance = getRadialDistance(semiMajorAxis, eccentricity, eccentricAnomalyRad);
+  const trueAnomalyRad = getTrueAnomalyRad(eccentricity, eccentricAnomalyRad, decimalPlaces);
+
+  const { x, y, z } = getCartPosition(
+    radialDistance,
+    longitudeAscendingNode,
+    inclination,
+    argPeriapsis,
+    trueAnomalyRad,
   );
   return {
     name,
@@ -167,8 +211,9 @@ function getOrbitalPosition(
     ...{
       x: astroMath.add(astroMath.unit(x, semiMajorAxisUnit), barycentre.x),
       y: astroMath.add(astroMath.unit(y, semiMajorAxisUnit), barycentre.y),
+      z: astroMath.add(astroMath.unit(z, semiMajorAxisUnit), barycentre?.z),
     },
-    phi: astroMath.unit(getTrueAnomaly(eccentricity, eccentricAnomaly, decimalPlaces), 'degrees'),
+    phi: astroMath.unit(trueAnomalyRad * 180 / Math.PI, 'degrees'),
   } as OrbitalPosition;
 }
 
@@ -178,18 +223,33 @@ function getOrbitalPosition(
  */
 function getOrbitalPositions(
   name: string,
-  semiMajorAxis: AstroUnit,
-  eccentricity: number,
-  period: AstroUnit,
-  { barycentre = cartOrigin, isPairPhased = false },
+  {
+    period,
+    semiMajorAxis,
+    eccentricity,
+  }: OrbitalShape,
+  {
+    longitudeAscendingNode = 0,
+    inclination = 0,
+    argPeriapsis = 0,
+  }: OrbitalOrientation,
+  {
+    barycentre = cartOrigin,
+    isPairPhased = false,
+  },
 ) {
-  // TODO allow conversion for higher precision
-  const periodInDays = period.toNumber(periodUnit);
-  const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
   const orbitalPositions = Array.from(
-    Array.from({ length: periodInDays }).keys(),
-    eachDay =>
-      getOrbitalPosition(name, eachDay, smaInMetres, eccentricity, periodInDays, {
+    Array.from({ length: period }).keys(),
+    stepOfOrbit =>
+      getOrbitalPosition(name, stepOfOrbit, {
+        semiMajorAxis,
+        eccentricity,
+        period,
+      }, {
+        longitudeAscendingNode,
+        inclination,
+        argPeriapsis,
+      }, {
         barycentre,
         isPairPhased,
       }),
@@ -204,42 +264,42 @@ function getOrbitalPositions(
  * Regardless of which has the longer period, it calculates the full orbit
  *
  * @param name
- * @param semiMajorAxis
- * @param eccentricity
- * @param period
+ * @param satelliteOrbitalShape
+ * @param satelliteOrbitalOrientation
  * @param planetPositions
  * @returns satellite positions keyed by day of orbit
  */
 function getSatellitePositions(
   name: string,
-  semiMajorAxis: number,
-  eccentricity: number,
-  period: number,
+  satelliteOrbitalShape: OrbitalShape,
+  satelliteOrbitalOrientation: OrbitalOrientation,
   planetPositions: ReturnType<typeof getOrbitalPositions>,
 ) {
-  const allPlanetDays = Object.keys(planetPositions);
+  const allPlanetSteps = Object.keys(planetPositions);
   // if planet orbit is longer, we should track the moons positions along that orbit
-  const fullOrbitalPeriod = Math.max(period, allPlanetDays.length);
+  const fullOrbitalPeriod = Math.max(satelliteOrbitalShape.period, allPlanetSteps.length);
   const orbitalPositions = Array.from(
     Array.from({ length: fullOrbitalPeriod }).keys(),
-    (eachDay) => {
+    (stepOfOrbit) => {
       // if the moons orbit is longer, we should mod the current day so when
       // the planet completes an orbit the correct positions are still used
-      const planetPositionDay = (eachDay % allPlanetDays.length).toFixed(0);
+      const planetPositionAtStep = (stepOfOrbit % allPlanetSteps.length).toFixed(0);
       invariant(
-        planetPositionDay in planetPositions,
-        `key '${planetPositionDay}' (${eachDay} % ${allPlanetDays.length}) not found in position dictionary`,
+        planetPositionAtStep in planetPositions,
+        `key '${planetPositionAtStep}' (${stepOfOrbit} % ${allPlanetSteps.length}) not found in position dictionary`,
       );
-      // need better handling, as 'planetPositionDay' should always be in 'planetPositions'
-      const { x, y } = planetPositions[planetPositionDay] ?? {};
-      invariant(x && y, 'x and y must be defined');
+      // need better handling, as 'planetPositionAtStep' should always be in 'planetPositions'
+      const { x, y, z } = planetPositions[planetPositionAtStep] ?? {};
+      invariant(
+        x !== undefined && y !== undefined && z !== undefined,
+        'x, y and z must be defined',
+      );
       return getOrbitalPosition(
         name,
-        eachDay,
-        semiMajorAxis,
-        eccentricity,
-        period,
-        { barycentre: { x, y } },
+        stepOfOrbit,
+        satelliteOrbitalShape,
+        satelliteOrbitalOrientation,
+        { barycentre: { x, y, z } },
       );
     },
   );
@@ -256,24 +316,43 @@ function getSatellitePositions(
 function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
   return starSystem.flatMap((stellarObject) => {
     const { satellites = [], name, posParams: params } = stellarObject;
-    const { semiMajorAxis, eccentricity, period, isPairPhased } = params;
-
-    const orbitalPositions = getOrbitalPositions(
-      name,
+    const {
       semiMajorAxis,
       eccentricity,
       period,
+      argPeriapsis = 0,
+      inclination = 0,
+      longitudeAscendingNode = 0,
+      isPairPhased = false,
+    } = params;
+    // TODO allow conversion for higher precision
+    const periodInDays = period.toNumber(periodUnit);
+    const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
+    const orbitalShape = { semiMajorAxis: smaInMetres, eccentricity, period: periodInDays };
+    const orbitalOrientation = { argPeriapsis, inclination, longitudeAscendingNode };
+    const orbitalPositions = getOrbitalPositions(
+      name,
+      orbitalShape,
+      orbitalOrientation,
       { isPairPhased },
     );
     const satellitePos = satellites.map(({ name, posParams: params }) => {
-      const { semiMajorAxis, eccentricity, period } = params;
+      const {
+        semiMajorAxis,
+        eccentricity,
+        period,
+        argPeriapsis = 0,
+        inclination = 0,
+        longitudeAscendingNode = 0,
+      } = params;
       const periodInDays = period.toNumber(periodUnit);
       const smaInMetres = semiMajorAxis.toNumber(semiMajorAxisUnit);
+      const orbitalShape = { semiMajorAxis: smaInMetres, eccentricity, period: periodInDays };
+      const orbitalOrientation = { argPeriapsis, inclination, longitudeAscendingNode };
       return getSatellitePositions(
         name,
-        smaInMetres,
-        eccentricity,
-        periodInDays,
+        orbitalShape,
+        orbitalOrientation,
         orbitalPositions,
       );
     });
