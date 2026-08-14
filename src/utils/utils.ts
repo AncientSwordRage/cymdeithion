@@ -1,9 +1,9 @@
 import type { Unit } from 'mathjs';
-import type { AstroUnit } from './astroMath.ts';
-import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
+import type { AstroUnit } from '../astroMath.ts';
+import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from '../StellarTypes.js';
 import { findKey, mapValues } from 'lodash-es';
 import invariant from 'tiny-invariant';
-import { getAstroMath } from './astroMath.ts';
+import { getAstroMath } from '../astroMath.ts';
 
 const astroMath = getAstroMath();
 

@@ -3,7 +3,7 @@ import type { StandardisedStellarObject } from './StellarTypes.d.ts';
 import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
-import { degToRad, rounding } from './utils.ts';
+import { degToRad, rounding } from './utils/utils.ts';
 
 const astroMath = getAstroMath();
 
@@ -26,10 +26,10 @@ const cartOrigin = {
  * @param offset Number of 'time unit' to offset the calculation by
  * @returns How far through the orbit the stellar object is
  */
-function getMeanAnomalyRad(time: number, period: number, offset: number) {
+export function getMeanAnomalyRad(time: number, period: number, offset?: number) {
   const pi = Math.PI;
   const meanMotion = (2 * pi) / period;
-  return meanMotion * ((time + offset) % period);
+  return meanMotion * ((time + (offset ?? 0)) % period);
 }
 
 /**
@@ -61,7 +61,6 @@ function getEccentricAnomalyRad(
     = updatedEccAnomaly
       - eccentricity * Math.sin(updatedMeanAnomaly)
       - updatedMeanAnomaly;
-
   while (Math.abs(residual) > delta && currentIteration < maxIter) {
     updatedEccAnomaly
       = updatedEccAnomaly
@@ -151,9 +150,9 @@ interface OrbitalOptions {
  * @param name The name of the stellar object
  * @param stepOfOrbit The temporal instance in the orbit
  * @param shape shape of the orbit
- * @param shape.period The total time taken to complete one orbit
+ * @param shape.period The total time taken to complete one orbit, in days
  * @param shape.semiMajorAxis Half the length of the largest axis of the ellipses
- * orbit
+ * orbit, in AU
  * @param shape.eccentricity How elliptical the orbit is, from 0 to 1
  * @param orientation orientation params
  * @param orientation.longitudeAscendingNode the point where the orbit of the object passes
@@ -165,10 +164,10 @@ interface OrbitalOptions {
  * satellites
  * @param options.meanAnomalyOffset where in the orbit the body
  * @returns details of the orbital positions
- * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycentre: 1, 0 })
+ * @example getOrbitalPosition('moon', { 15, 1, 0.01 }, { 0, 0, 0 }, { 1, 0 })
  * // returns { name: 'moon', stepOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
  */
-function getOrbitalPosition(
+export function getOrbitalPosition(
   name: string,
   stepOfOrbit: number,
   {
@@ -225,7 +224,7 @@ function getOrbitalPosition(
  * Wrapper for @see{getOrbitalPosition}
  * @returns orbital positions keyed by `stepOfOrbit`
  */
-function getOrbitalPositions(
+export function getOrbitalPositions(
   name: string,
   {
     period,
