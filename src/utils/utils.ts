@@ -83,7 +83,7 @@ const unitPattern = /^(?<value>-?(?:\d*\.\d+|\d+)(?:E[+-]?\d+)?)\s+(?<unit>\w+(?
 
 export function standardiseToAstroUnit<T>(inputUnit: T): Transform<T> {
   if (inputUnit === undefined || inputUnit === null) {
-    throw new Error(`Cannot standardise ${typeof inputUnit} values`);
+    throw new Error(`Cannot standardise ${inputUnit === undefined ? 'undefined' : 'null'} values`);
   }
   let standardUnit: AstroUnit | undefined;
   if (typeof inputUnit === 'string') {

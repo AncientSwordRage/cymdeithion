@@ -64,6 +64,18 @@ describe('getOrbitalPosition', () => {
     expect(orbitalPosition.revolutions).toEqual(0);
     expect(unitToString(astroMath, orbitalPosition.phi, 'radian')).toMatch(/-2.9269\d+ radian/);
   });
+  it('phi and revolutions calculated - offset', () => {
+    const offsetOptions = { ...testOptions, meanAnomalyOffset: 50 };
+    const orbitalPosition = getOrbitalPosition(
+      'Test Body',
+      25,
+      testOrbitalShape,
+      testOrbitalOrientation,
+      offsetOptions,
+    );
+    expect(orbitalPosition.revolutions).toEqual(0);
+    expect(unitToString(astroMath, orbitalPosition.phi, 'radian')).toMatch(/-1.570\d+ radian/);
+  });
 });
 describe('getOrbitalPositions', () => {
   // TODO add more test cases
@@ -89,16 +101,19 @@ describe('getOrbitalPositions', () => {
 describe('getFullOrbits', () => {
   const standardisedStarSystem = standardiseSystem(simpleSolarSystem);
   const fullOrbits = getFullOrbits(standardisedStarSystem);
-  const earth = simpleSolarSystem.find(body => body.name === 'Earth');
-  expect(earth).toBeDefined();
-  const period = Number.parseInt(earth?.posParams?.period as `\d+`, 10);
-  const tenthOfOrbit = Math.round(period / 10);
-  Array.from({ length: 10 }).keys().forEach((stepProportion: number) => {
-    const stepOfOrbit = stepProportion * tenthOfOrbit;
-    const expectedStep = expect.objectContaining({
-      name: 'Test Body',
-      stepOfOrbit,
-    }) as OrbitalPosition;
-    expect(fullOrbits[stepOfOrbit] as OrbitalPosition[]).toMatchObject(expectedStep);
+  const earth = standardisedStarSystem.find(body => body.name === 'Earth');
+  const periodInDays = earth!.posParams.period.toNumber('day');
+  const tenthOfOrbit = Math.round(periodInDays / 10);
+  const sampleSteps = Array.from({ length: 10 }, (_, i) => i * tenthOfOrbit);
+  const expectedNames = simpleSolarSystem.flatMap(
+    body => [body.name, ...(body.satellites?.map(s => s.name) ?? [])],
+  ); // ['Sol', 'Earth', 'Luna']
+
+  it.each(sampleSteps)('every stellar body is present on day %i', (stepOfOrbit) => {
+    const dayPositions = fullOrbits[stepOfOrbit] as OrbitalPosition[];
+    expect(dayPositions).toEqual(
+      expect.arrayContaining(expectedNames.map(name => expect.objectContaining({ name, stepOfOrbit }) as OrbitalPosition)),
+    );
+    expect(dayPositions).toHaveLength(expectedNames.length);
   });
 });

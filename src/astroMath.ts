@@ -61,10 +61,14 @@ export function getAstroMath() {
 }
 
 function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
+  invariant(
+    referenceBody !== undefined && referenceBody.intrinsicParams.rotationPeriod !== undefined,
+    'Reference Body missing rotation period',
+  );
   const referenceBodyUnits = referenceBody !== undefined
     ? {
         day: {
-          definition: referenceBody.intrinsicParams.rotationPeriod as string ?? '1 day',
+          definition: referenceBody.intrinsicParams.rotationPeriod,
           aliases: [`${referenceBody.name}Day`, 'LocalDays'],
         },
       } as Record<string, UnitDefinition>
@@ -97,7 +101,7 @@ function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
   }, {
     override: true,
   });
-  if (referenceBody) {
+  if (Object.keys(referenceBody).length > 0) {
     math.createUnit(referenceBodyUnits, {
       override: true,
     });

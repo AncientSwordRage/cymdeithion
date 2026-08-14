@@ -1,6 +1,6 @@
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.d.ts';
-import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
+import { groupBy, keyBy } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
 import { degToRad, rounding } from './utils/utils.ts';
@@ -142,6 +142,7 @@ interface OrbitalOrientation {
 interface OrbitalOptions {
   barycentre?: typeof cartOrigin;
   meanAnomalyOffset?: number;
+  stepsOverride?: number;
 }
 
 /**
@@ -189,7 +190,7 @@ export function getOrbitalPosition(
   const meanAnomalyRad = getMeanAnomalyRad(
     stepOfOrbit,
     period,
-    meanAnomalyOffset ? period / 2 : 0,
+    meanAnomalyOffset,
   );
   const eccentricAnomalyRad = getEccentricAnomalyRad(
     eccentricity,
@@ -239,10 +240,11 @@ export function getOrbitalPositions(
   {
     barycentre = cartOrigin,
     meanAnomalyOffset = 0,
+    stepsOverride,
   }: OrbitalOptions,
 ) {
   const orbitalPositions = Array.from(
-    Array.from({ length: period }).keys(),
+    Array.from({ length: stepsOverride ?? period }).keys(),
     stepOfOrbit =>
       getOrbitalPosition(name, stepOfOrbit, {
         semiMajorAxis,
@@ -317,6 +319,9 @@ function getSatellitePositions(
  * @returns An array of all position data points for the star system
  */
 function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
+  const longestPeriod = Math.max(
+    ...starSystem.map(({ posParams }) => posParams.period.toNumber(periodUnit)),
+  );
   return starSystem.flatMap((stellarObject) => {
     const { satellites = [], name, posParams: params } = stellarObject;
     const {
@@ -327,7 +332,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       inclination = 0,
       longitudeAscendingNode = 0,
       isPairPhased = false,
-      meanAnomalyOffset = isPairPhased ? 180 : 0,
+      meanAnomalyOffset = isPairPhased ? period.toNumber(periodUnit) / 2 : 0,
     } = params;
     // TODO allow conversion for higher precision
     const periodInDays = period.toNumber(periodUnit);
@@ -338,7 +343,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       name,
       orbitalShape,
       orbitalOrientation,
-      { meanAnomalyOffset },
+      { meanAnomalyOffset, stepsOverride: longestPeriod },
     );
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const {
@@ -371,28 +376,8 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
  * data for each planet.
  */
 export function getFullOrbits(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
-  const stellarObjectByDay = groupBy(
+  return groupBy(
     getAllPositions(starSystem).flatMap(positions => Object.values(positions)),
     'stepOfOrbit',
-  );
-
-  const stellarObjectEntries = Object.entries(stellarObjectByDay);
-  const lengthOrbitsCount = stellarObjectEntries.at(0)?.at(1)?.length;
-  const [completeSet, incompleteSet] = partition(stellarObjectEntries, ([, stellarObjects]) => stellarObjects.length === lengthOrbitsCount);
-
-  const fullOrbits = incompleteSet.reduce((memo, [currentStep, currentObjects]) => {
-    const stepNumber = Number.parseInt(currentStep);
-    const previousObjects = memo?.[stepNumber - 1];
-    if (!previousObjects)
-      throw new Error(`No previous day found for ${stepNumber - 1}`);
-    const missingObjects = xorBy(previousObjects, currentObjects, 'name');
-    const correctedMissingObjects = missingObjects.flatMap((stellarObj) => {
-      const periodAsNumber = stellarObj.period.toNumber(periodUnit);
-      const modulusStepNumber = stepNumber % periodAsNumber;
-      const correctedMissingObject = memo[modulusStepNumber]?.find(eachObject => eachObject.name === stellarObj.name);
-      return correctedMissingObject ? [{ ...correctedMissingObject, stepOfOrbit: stepNumber, revolutions: Math.trunc(stepNumber / periodAsNumber) }] : [];
-    });
-    return { ...memo, [currentStep]: [...correctedMissingObjects, ...currentObjects] };
-  }, Object.fromEntries(completeSet));
-  return fullOrbits;
+  ) as Record<string, OrbitalPosition[]>;
 }

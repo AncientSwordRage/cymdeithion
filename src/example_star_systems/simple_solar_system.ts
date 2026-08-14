@@ -27,7 +27,7 @@ export const simpleSolarSystem: StellarObject<'planet' | 'satellite' | 'star'>[]
       longitudeAscendingNode: 0,
     },
     intrinsicParams: {
-      mass: '1.09e025 kg',
+      mass: '5.976e24 kg',
       rotationPeriod: '1 day',
     },
     type: 'planet',
