@@ -60,19 +60,36 @@ export function getAstroMath() {
   return astroMath;
 }
 
+const realEarthDay: Record<string, UnitDefinition> = {
+  day: { definition: '86400 s', aliases: ['LocalDays'] },
+};
+
+function buildDayUnit(referenceBody: undefined | ReferenceBody): Record<string, UnitDefinition> {
+  if (referenceBody === undefined) {
+    return realEarthDay;
+  }
+  const { rotationPeriod } = referenceBody.intrinsicParams;
+  if (rotationPeriod === undefined) {
+    // failsafe
+    return realEarthDay;
+  }
+  const definition = typeof rotationPeriod === 'string'
+    ? rotationPeriod
+    : `${rotationPeriod.value} ${rotationPeriod.unit}`;
+  return {
+    day: {
+      definition,
+      aliases: [`${referenceBody.name}Day`, 'LocalDays'],
+    },
+  };
+}
+
 function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
   invariant(
-    referenceBody !== undefined && referenceBody.intrinsicParams.rotationPeriod !== undefined,
+    referenceBody === undefined || referenceBody.intrinsicParams.rotationPeriod !== undefined,
     'Reference Body missing rotation period',
   );
-  const referenceBodyUnits = referenceBody !== undefined
-    ? {
-        day: {
-          definition: referenceBody.intrinsicParams.rotationPeriod,
-          aliases: [`${referenceBody.name}Day`, 'LocalDays'],
-        },
-      } as Record<string, UnitDefinition>
-    : {};
+  const dayUnit = buildDayUnit(referenceBody);
   math.createUnit({
     AU: {
       definition: '1.495979e11 m',
@@ -101,12 +118,15 @@ function launch_mathjs(referenceBody?: undefined | ReferenceBody) {
   }, {
     override: true,
   });
-  if (Object.keys(referenceBody).length > 0) {
-    math.createUnit(referenceBodyUnits, {
-      override: true,
-    });
-  }
+  math.createUnit(dayUnit, {
+    override: true,
+  });
   return math;
+}
+
+export function setReferenceSystem(referenceBody: undefined | ReferenceBody) {
+  astroMath = launch_mathjs(referenceBody);
+  return astroMath;
 }
 
 // configure specific units etc
