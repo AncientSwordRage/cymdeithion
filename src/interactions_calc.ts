@@ -6,7 +6,7 @@ import type { Vec3 } from './utils/vec3Utils.ts';
 import { mapValues } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
-import { getBase } from './utils.ts';
+import { getBase } from './utils/utils.ts';
 import { coordsFromUnit, getDirection, normalizeThreeVec } from './utils/vec3Utils.ts';
 
 const astroMath = getAstroMath();
@@ -26,7 +26,7 @@ type PairwiseInteractions = Record<PairKey, {
   directionBA: Vec3;
 }>;
 
-function getPairings(bodies: OrbitalPosition[]) {
+export function getPairings(bodies: OrbitalPosition[]) {
   return bodies.flatMap((eachBody, i) => bodies
     .slice(i + 1)
     .map((otherBody) => {
@@ -70,7 +70,11 @@ export function getGravitationalForce(massA: AstroUnit, massB: AstroUnit, distan
   ) as AstroUnit;
   return gravForce.toBest();
 }
+
 const zeroGravityVector = Array.from({ length: 3 }).fill(astroMath.unit('0 N')) as MathArray<AstroUnit>;
+
+// TODO test this function
+/* v8 ignore start -- @preserve */
 export function getInteractions(
   fullOrbit: Record<number, OrbitalPosition[]>,
   starSystem: StandardisedStellarObject<'star' | 'planet' | 'satellite'>[],
@@ -134,3 +138,4 @@ export function getInteractions(
     return { bodies, interactions, bodyTotals };
   });
 }
+/* v8 ignore stop -- @preserve */

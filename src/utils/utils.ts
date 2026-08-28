@@ -1,9 +1,9 @@
 import type { Unit } from 'mathjs';
-import type { AstroUnit } from './astroMath.ts';
-import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from './StellarTypes.js';
+import type { AstroUnit } from '../astroMath.ts';
+import type { StandardisedStellarObject, StellarObject, StringUnits, Transform } from '../StellarTypes.js';
 import { findKey, mapValues } from 'lodash-es';
 import invariant from 'tiny-invariant';
-import { getAstroMath } from './astroMath.ts';
+import { getAstroMath } from '../astroMath.ts';
 
 const astroMath = getAstroMath();
 
@@ -83,7 +83,7 @@ const unitPattern = /^(?<value>-?(?:\d*\.\d+|\d+)(?:E[+-]?\d+)?)\s+(?<unit>\w+(?
 
 export function standardiseToAstroUnit<T>(inputUnit: T): Transform<T> {
   if (inputUnit === undefined || inputUnit === null) {
-    throw new Error(`Cannot standardise ${typeof inputUnit} values`);
+    throw new Error(`Cannot standardise ${inputUnit === undefined ? 'undefined' : 'null'} values`);
   }
   let standardUnit: AstroUnit | undefined;
   if (typeof inputUnit === 'string') {

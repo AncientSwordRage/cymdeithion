@@ -8,7 +8,8 @@
     "calc": "node ./src/ground_control.ts",
     "lint": "eslint --ext .js,.ts --fix",
     "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",
-    "test": "node ./src/astroMath.test.ts"
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -18,16 +19,19 @@
   "devDependencies": {
     "@antfu/eslint-config": "^7.7.2",
     "@eslint/js": "^10.0.1",
+    "@faker-js/faker": "^10.6.0",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^25.4.0",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.4.0",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0"
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "lodash-es": "^4.17.23",

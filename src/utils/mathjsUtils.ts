@@ -7,10 +7,6 @@ interface UnitJson {
   fixPrefix?: boolean;
 }
 
-// interface MathJsInstance {
-//   isUnit?: (value: unknown) => boolean;
-// }
-
 export function isSerializedUnit(value: unknown): value is UnitJson {
   if (typeof value !== 'object' || value === null) {
     return false;

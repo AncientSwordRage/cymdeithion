@@ -10,14 +10,10 @@ type Range<F extends number, T extends number> = Exclude<
   Enumerate<F>
 >;
 
-interface Measures {
-  time: 'seconds' | 'hours' | 'days';
-  space: 'meters' | 'AU' | 'ly';
-  mass: 'g' | 'kg' | 'm_sol' | 'm_earth';
-}
+type Only<T, U> = {
+  [P in keyof T]: T[P];
+} & {
+  [P in keyof U]?: never;
+};
 
-interface PhysicalMeasure<T extends keyof Measures> {
-  typeOfMeasure: T;
-  unitName: Measures[T];
-  amount: number;
-}
+type Either<T, U> = Only<T, U> | Only<U, T>;

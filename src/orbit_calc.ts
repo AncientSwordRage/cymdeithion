@@ -1,9 +1,9 @@
 import type { OrbitalPosition } from './orbit.types.ts';
 import type { StandardisedStellarObject } from './StellarTypes.d.ts';
-import { groupBy, keyBy, partition, xorBy } from 'lodash-es';
+import { groupBy, keyBy } from 'lodash-es';
 import invariant from 'tiny-invariant';
 import { getAstroMath } from './astroMath.ts';
-import { degToRad, rounding } from './utils.ts';
+import { degToRad, rounding } from './utils/utils.ts';
 
 const astroMath = getAstroMath();
 
@@ -26,10 +26,10 @@ const cartOrigin = {
  * @param offset Number of 'time unit' to offset the calculation by
  * @returns How far through the orbit the stellar object is
  */
-function getMeanAnomalyRad(time: number, period: number, offset: number) {
+export function getMeanAnomalyRad(time: number, period: number, offset?: number) {
   const pi = Math.PI;
   const meanMotion = (2 * pi) / period;
-  return meanMotion * ((time + offset) % period);
+  return meanMotion * ((time + (offset ?? 0)) % period);
 }
 
 /**
@@ -61,7 +61,6 @@ function getEccentricAnomalyRad(
     = updatedEccAnomaly
       - eccentricity * Math.sin(updatedMeanAnomaly)
       - updatedMeanAnomaly;
-
   while (Math.abs(residual) > delta && currentIteration < maxIter) {
     updatedEccAnomaly
       = updatedEccAnomaly
@@ -140,15 +139,21 @@ interface OrbitalOrientation {
   inclination: number;
   argPeriapsis: number;
 }
+interface OrbitalOptions {
+  barycentre?: typeof cartOrigin;
+  meanAnomalyOffset?: number;
+  stepsOverride?: number;
+}
+
 /**
  * Gets the instantaneous position of the stellar object in orbit, as well as
  * the name and day this is for
  * @param name The name of the stellar object
  * @param stepOfOrbit The temporal instance in the orbit
  * @param shape shape of the orbit
- * @param shape.period The total time taken to complete one orbit
+ * @param shape.period The total time taken to complete one orbit, in days
  * @param shape.semiMajorAxis Half the length of the largest axis of the ellipses
- * orbit
+ * orbit, in AU
  * @param shape.eccentricity How elliptical the orbit is, from 0 to 1
  * @param orientation orientation params
  * @param orientation.longitudeAscendingNode the point where the orbit of the object passes
@@ -158,13 +163,12 @@ interface OrbitalOrientation {
  * @param options options for calculation
  * @param options.barycentre the base x, y co-ord for the oject, e.g. for
  * satellites
- * @param options.isPairPhased if this object is out of phase with a partner
- * object
+ * @param options.meanAnomalyOffset where in the orbit the body
  * @returns details of the orbital positions
- * @example getOrbitalPosition('moon', 15, 0.01, 0.01, 30, { barycentre: 1, 0 })
+ * @example getOrbitalPosition('moon', { 15, 1, 0.01 }, { 0, 0, 0 }, { 1, 0 })
  * // returns { name: 'moon', stepOfOrbit: 15, x: 1, y: 0.01, phi: 90 }
  */
-function getOrbitalPosition(
+export function getOrbitalPosition(
   name: string,
   stepOfOrbit: number,
   {
@@ -179,14 +183,14 @@ function getOrbitalPosition(
   }: OrbitalOrientation,
   {
     barycentre = cartOrigin,
-    isPairPhased = false,
-  },
+    meanAnomalyOffset = 0,
+  }: OrbitalOptions,
 ) {
   const decimalPlaces = 5;
   const meanAnomalyRad = getMeanAnomalyRad(
     stepOfOrbit,
     period,
-    isPairPhased ? period / 2 : 0,
+    meanAnomalyOffset,
   );
   const eccentricAnomalyRad = getEccentricAnomalyRad(
     eccentricity,
@@ -221,7 +225,7 @@ function getOrbitalPosition(
  * Wrapper for @see{getOrbitalPosition}
  * @returns orbital positions keyed by `stepOfOrbit`
  */
-function getOrbitalPositions(
+export function getOrbitalPositions(
   name: string,
   {
     period,
@@ -235,11 +239,12 @@ function getOrbitalPositions(
   }: OrbitalOrientation,
   {
     barycentre = cartOrigin,
-    isPairPhased = false,
-  },
+    meanAnomalyOffset = 0,
+    stepsOverride,
+  }: OrbitalOptions,
 ) {
   const orbitalPositions = Array.from(
-    Array.from({ length: period }).keys(),
+    Array.from({ length: stepsOverride ?? period }).keys(),
     stepOfOrbit =>
       getOrbitalPosition(name, stepOfOrbit, {
         semiMajorAxis,
@@ -251,7 +256,7 @@ function getOrbitalPositions(
         argPeriapsis,
       }, {
         barycentre,
-        isPairPhased,
+        meanAnomalyOffset,
       }),
   );
   return keyBy(orbitalPositions, 'stepOfOrbit') as Record<string, OrbitalPosition>;
@@ -314,6 +319,9 @@ function getSatellitePositions(
  * @returns An array of all position data points for the star system
  */
 function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
+  const longestPeriod = Math.max(
+    ...starSystem.map(({ posParams }) => posParams.period.toNumber(periodUnit)),
+  );
   return starSystem.flatMap((stellarObject) => {
     const { satellites = [], name, posParams: params } = stellarObject;
     const {
@@ -324,6 +332,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       inclination = 0,
       longitudeAscendingNode = 0,
       isPairPhased = false,
+      meanAnomalyOffset = isPairPhased ? period.toNumber(periodUnit) / 2 : 0,
     } = params;
     // TODO allow conversion for higher precision
     const periodInDays = period.toNumber(periodUnit);
@@ -334,7 +343,7 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
       name,
       orbitalShape,
       orbitalOrientation,
-      { isPairPhased },
+      { meanAnomalyOffset, stepsOverride: longestPeriod },
     );
     const satellitePos = satellites.map(({ name, posParams: params }) => {
       const {
@@ -367,28 +376,8 @@ function getAllPositions(starSystem: StandardisedStellarObject<'planet' | 'satel
  * data for each planet.
  */
 export function getFullOrbits(starSystem: StandardisedStellarObject<'planet' | 'satellite' | 'star'>[]) {
-  const stellarObjectByDay = groupBy(
+  return groupBy(
     getAllPositions(starSystem).flatMap(positions => Object.values(positions)),
     'stepOfOrbit',
-  );
-
-  const stellarObjectEntries = Object.entries(stellarObjectByDay);
-  const lengthOrbitsCount = stellarObjectEntries.at(0)?.at(1)?.length;
-  const [completeSet, incompleteSet] = partition(stellarObjectEntries, ([, stellarObjects]) => stellarObjects.length === lengthOrbitsCount);
-
-  const fullOrbits = incompleteSet.reduce((memo, [currentStep, currentObjects]) => {
-    const stepNumber = Number.parseInt(currentStep);
-    const previousObjects = memo?.[stepNumber - 1];
-    if (!previousObjects)
-      throw new Error(`No previous day found for ${stepNumber - 1}`);
-    const missingObjects = xorBy(previousObjects, currentObjects, 'name');
-    const correctedMissingObjects = missingObjects.flatMap((stellarObj) => {
-      const periodAsNumber = stellarObj.period.toNumber(periodUnit);
-      const modulusStepNumber = stepNumber % periodAsNumber;
-      const correctedMissingObject = memo[modulusStepNumber]?.find(eachObject => eachObject.name === stellarObj.name);
-      return correctedMissingObject ? [{ ...correctedMissingObject, stepOfOrbit: stepNumber, revolutions: Math.trunc(stepNumber / periodAsNumber) }] : [];
-    });
-    return { ...memo, [currentStep]: [...correctedMissingObjects, ...currentObjects] };
-  }, Object.fromEntries(completeSet));
-  return fullOrbits;
+  ) as Record<string, OrbitalPosition[]>;
 }
