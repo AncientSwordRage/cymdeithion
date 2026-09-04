@@ -8,7 +8,7 @@
 
 Current Calculations:
 
- - Gravity
+- Gravity
 
 ## What's Next
 
@@ -25,6 +25,7 @@ TODO automate some kind of update from the latest release. Link to CHANGELOG.md
 <!-- cliff:whats-changed:end -->
 
 ## Contributing
+
 TODO link to CONTRIBUTING.md
 
 ## Recent Contributors
