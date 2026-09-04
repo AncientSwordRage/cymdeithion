@@ -1,0 +1,4 @@
+# enforce defaults
+enablePrePostScripts: true
+minimumReleaseAge: 1440
+blockExoticSubdeps: true
