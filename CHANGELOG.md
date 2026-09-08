@@ -4,6 +4,12 @@
 
 - First pass at adding interaction calculations (#3)
 - [**breaking**] Add whole system interactions (#6)
+- *(orbit)* Calculate the z-dimension (#7)
+- Cargo download future deps
+
+### 🐛 Bug Fixes
+
+- *(husky)* Call commitlint directly, no pnpm needed
 
 ### 📚 Documentation
 
@@ -15,7 +21,10 @@
 - Upload of initial code used to calculate orbits (#1)
 - Removes duplicates (#2)
 - [**breaking**] Implement mathjs (#5)
+- Update pnpm to 11 (#9)
 - *(settings)* Add project words to cSpell
 - *(automation)* Add git-cliff (config etc)
 - *(automation)* [**breaking**] Update package and lockfile to work with commitizen
 - *(automation)* [**breaking**] Add commitlint, husky and commit lint config
+- *(automation)* Start work on release-and-update-docs.sh
+- Lint markdown

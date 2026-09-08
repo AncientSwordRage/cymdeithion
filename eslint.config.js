@@ -7,6 +7,7 @@ export default antfu({
   ignores: ['package-lock.json', 'package.json', 'tsconfig.json'],
   rules: {
     'style/semi': ['error', 'always'],
+    'style/brace-style': ['error', '1tbs', { allowSingleLine: true }],
     'style/member-delimiter-style': ['error', {
       multiline: {
         delimiter: 'semi',
