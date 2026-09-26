@@ -1,7 +1,11 @@
-{% raw %}
 # cymdeithion
 
-*Cymdeithion* is the Welsh word for *companions* or *fellow-travellers*. This repository aims to assist in making calculations of a known fixed orbit. As the motion is derived solely from Kepler's laws (TODO, add link), and the systems motion doesn't evolve, the program doesn't claim to be an orbital simulation. However sufficient calculations are provided that the amount of gravitational perturbations can be calculated.
+*Cymdeithion* is the Welsh word for *companions* or *fellow-travellers*. This
+repository aims to assist in making calculations of a known fixed orbit. As the
+motion is derived solely from Kepler's laws (TODO, add link), and the systems
+motion doesn't evolve, the program doesn't claim to be an orbital simulation.
+However sufficient calculations are provided that the amount of gravitational
+perturbations can be calculated.
 
 ## Orbital Calculations
 
@@ -9,22 +13,42 @@ Current Calculations:
 
  - Gravity
 
-## What's Next
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner -}}/{{ remote.github.repo -}}
+{%- endmacro -%}
 
-<!-- cliff:up-next:start -->
-<!-- cliff:up-next:end -->
+{% macro print_commit(commit) %}
+    - {% if commit.scope %}*({{ commit.scope -}})* {% endif -%}
+        {% if commit.breaking -%}[**breaking**] {% endif -%}
+        {{ commit.message | upper_first }} - ([{{- commit.id | truncate(length=7, end="") -}}]({{- self::remote_url() -}}/commit/{{- commit.id }}))
+{% endmacro %}
 
-## Recent Changes
+{% if version %}
+    {% if previous.version %}
+        ## [{{ version | trim_start_matches(pat="v") -}}]
+          ({{ self::remote_url() }}/compare/{{ previous.version }}..{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") -}}
+    {% else %}
+        ## [{{ version | trim_start_matches(pat="v") -}}] - {{ timestamp | date(format="%Y-%m-%d") -}}
+    {% endif %}
+{% else %}
+    ## [What's Next]
+{% endif %}
 
-TODO automate some kind of update from the latest release. Link to CHANGELOG.md
-
-<!-- cliff:whats-changed:start -->
-<!-- cliff:whats-changed:end -->
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits
+    | filter(attribute="scope")
+    | sort(attribute="scope") -%}
+        {{ self::print_commit(commit=commit) -}}
+    {%- endfor %}
+    {% for commit in commits -%}
+        {%- if not commit.scope -%}
+            {{ self::print_commit(commit=commit) -}}
+        {% endif -%}
+    {% endfor -%}
+{% endfor -%}
 
 ## Contributing
 TODO link to CONTRIBUTING.md
 
 ## Recent Contributors
-<!-- cliff:contributors:start -->
-<!-- cliff:contributors:end -->
-{% endraw %}

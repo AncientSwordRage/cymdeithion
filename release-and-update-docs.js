@@ -4,10 +4,9 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
-import semver from 'semver';
-import { resolveFutureDependency } from './scripts/futureDeps.ts';
+import which from 'which';
 
-const { path: gitCliff, futureVersion } = resolveFutureDependency('git-cliff', { install: true });
+const gitCliff = which.sync('git-cliff', { nothrow: true });
 
 const tokenPath = join(homedir(), 'dev', '.secrets', 'git-cliff-github-token');
 process.env.GITHUB_TOKEN = readFileSync(tokenPath, 'utf8').trim();
@@ -16,10 +15,10 @@ process.env.GITHUB_TOKEN = readFileSync(tokenPath, 'utf8').trim();
 // const version = execFileSync(gitCliff, ['--bumped-version'], { encoding: 'utf8' }).trim();
 
 // 2) generate CHANGELOG.md
-execFileSync(gitCliff, ['--output', 'CHANGELOG.md'], { stdio: 'inherit' });
+execFileSync(gitCliff, ['--output', 'CHANGELOG.md'], { stdio: 'inherit', shell: true });
 
 // 3) generate README.md (--body-file needs git-cliff 2.14+)
-execFileSync(gitCliff, ['--body-file', 'readme-template.tera', '--output', 'README2.md'], { stdio: 'inherit' });
+execFileSync(gitCliff, ['--body-file', 'readme-template.tera', '--output', 'README.md'], { stdio: 'inherit', shell: true });
 
 // 4) prepare the release commit and tag
 // execFileSync('git', ['add', 'CHANGELOG.md', 'README.md']);

@@ -1,3 +1,5 @@
+# CHANGELOG
+
 ## [unreleased]
 
 ### 🚀 Features
@@ -27,3 +29,4 @@
 - *(automation)* [**breaking**] Add commitlint, husky and commit lint config
 - *(automation)* Start work on release-and-update-docs.sh
 - Lint markdown
+- *(automation)* Update release-and-update-docs
