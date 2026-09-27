@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "calc": "node ./src/ground_control.ts",
-    "changelog": "node ./release-and-update-docs.js && node node_modules/markdownlint-cli/markdownlint.js -f *.md",
+    "changelog": "node ./release-and-update-docs.js && node node_modules/markdownlint-cli/markdownlint.js --disable MD013 -f  *.md",
     "commit": "cz",
     "coverage": "vitest run --coverage",
     "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",

@@ -17,8 +17,10 @@ process.env.GITHUB_TOKEN = readFileSync(tokenPath, 'utf8').trim();
 // 2) generate CHANGELOG.md
 execFileSync(gitCliff, ['--output', 'CHANGELOG.md'], { stdio: 'inherit', shell: true });
 
-// 3) generate README.md (--body-file needs git-cliff 2.14+)
+// 3) generate README.md
 execFileSync(gitCliff, ['--body-file', 'readme-template.tera', '--output', 'README.md'], { stdio: 'inherit', shell: true });
+// 4) generate CONTRIBUTING.md
+execFileSync(gitCliff, ['--body-file', 'contributing-template.tera', '--output', 'CONTRIBUTING.md'], { stdio: 'inherit', shell: true });
 
 // 4) prepare the release commit and tag
 // execFileSync('git', ['add', 'CHANGELOG.md', 'README.md']);

@@ -30,3 +30,4 @@
 - *(automation)* Start work on release-and-update-docs.sh
 - Lint markdown
 - *(automation)* Update release-and-update-docs
+- *(automation)* Update package script and add markdown lint

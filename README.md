@@ -45,6 +45,8 @@ Current Calculations:
 
 - *(automation)* Update release-and-update-docs - ([95f1615](https://github.com/AncientSwordRage/Cymdeithion/commit/95f1615cc38ca610eaf82a060515fd775801195b))
 
+- *(automation)* Update package script and add markdown lint - ([740263b](https://github.com/AncientSwordRage/Cymdeithion/commit/740263b2c14af8622eabbe3e98920a4cd51135e9))
+
 - *(settings)* Add project words to cSpell - ([1b95d16](https://github.com/AncientSwordRage/Cymdeithion/commit/1b95d16384fc4cad50cefd45021d7f870b5625b7))
 
 - Upload of initial code used to calculate orbits (#1) - ([db475fc](https://github.com/AncientSwordRage/Cymdeithion/commit/db475fcc28ac28fc32d42fc5630a5cf0d56982ae))
