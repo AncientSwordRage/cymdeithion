@@ -31,3 +31,4 @@
 - Lint markdown
 - *(automation)* Update release-and-update-docs
 - *(automation)* Update package script and add markdown lint
+- *(automation)* Add contribution template
